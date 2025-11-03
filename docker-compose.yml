@@ -1,0 +1,103 @@
+services:
+  # ========================================
+  # MySQL Database
+  # ========================================
+  db:
+    image: mysql:8.0
+    container_name: blood_test_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASS}
+      MYSQL_DATABASE: ${DB_NAME}
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASS}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  # ========================================
+  # Backend (Production)
+  # ========================================
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: blood-test-backend:latest
+    container_name: blood_test_backend
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT}:3000"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DB_HOST: db
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ========================================
+  # Backend (Development)
+  # ========================================
+  backend-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    image: blood-test-backend:dev
+    container_name: blood_test_backend_dev
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: development
+      DB_HOST: db
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  # ========================================
+  # Adminer (Database UI)
+  # ========================================
+  adminer:
+    image: adminer:latest
+    container_name: blood_test_adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: db
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+    driver: local

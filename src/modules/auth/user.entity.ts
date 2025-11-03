@@ -1,27 +1,31 @@
 import {
-  Column,
   Entity,
   PrimaryGeneratedColumn,
+  Column,
   CreateDateColumn,
+  UpdateDateColumn,
 } from 'typeorm';
-import { Exclude } from 'class-transformer';
 
 @Entity({ name: 'users' })
-export class UserEntity {
+export class User {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ unique: true })
-  username: string;
+  @Column({ unique: true, nullable: false })
+  email: string;
 
-  @Column()
-  @Exclude()
-  password: string;
+  @Column({ nullable: true, length: 50 })
+  provider: string;
 
-  @Column({ nullable: true })
-  @Exclude()
-  refreshToken: string | null;
+  @Column({ name: 'provider_id', nullable: true, length: 255 })
+  providerId: string;
 
-  @CreateDateColumn()
+  @Column({ name: 'refresh_token', nullable: true, type: 'text' })
+  refreshToken: string;
+
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
+
+  @UpdateDateColumn({ name: 'updated_at' })
+  updatedAt: Date;
 }

@@ -1,0 +1,37 @@
+FROM node:20-bookworm-slim
+
+# Install dumb-init and security updates
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends \
+        dumb-init \
+        python3 \
+        make \
+        g++ \
+        ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install all dependencies (including dev)
+RUN npm install --ignore-scripts && \
+    npm cache clean --force
+
+# Copy source code
+COPY . .
+
+# Expose port
+EXPOSE 3000
+
+# Start in development mode with hot reload
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["npm", "run", "start:dev"]
+
+# Metadata
+LABEL maintainer="mchukhrai@zenbit.tech" \
+      version="1.0.0-dev" \
+      description="Blood Test Analyzer Backend - Development"

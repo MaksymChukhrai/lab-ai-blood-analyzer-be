@@ -13,6 +13,17 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
+/**
+ * Authentication Module
+ * Provides JWT-based authentication infrastructure for the application
+ *
+ * Features:
+ * - JWT access and refresh token management
+ * - Magic Link passwordless authentication
+ * - Global authentication guard with @Public() decorator support
+ * - Passport strategies for token validation
+ * - User entity and TypeORM integration
+ */
 @Module({
   imports: [
     TypeOrmModule.forFeature([UserEntity, MagicLinkTokenEntity]),
@@ -39,6 +50,6 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
       useClass: JwtAuthGuard,
     },
   ],
-  exports: [AuthService],
+  exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

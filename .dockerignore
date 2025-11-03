@@ -1,0 +1,77 @@
+# Dependencies
+node_modules
+npm-debug.log
+yarn-error.log
+package-lock.json
+
+# Build outputs
+dist
+build
+*.log
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Environment (SECURITY: never copy .env to image!)
+.env
+.env.*
+*.env
+
+# Secrets (SECURITY)
+*.pem
+*.key
+*.cert
+*.crt
+secrets/
+credentials/
+
+# Documentation
+README.md
+docs/
+*.md
+!package-lock.json
+
+# Docker
+Dockerfile
+Dockerfile.*
+docker-compose*.yml
+.dockerignore
+
+# Testing
+coverage
+.nyc_output
+*.test.ts
+*.spec.ts
+test/
+__tests__/
+
+# CI/CD
+.github
+.gitlab-ci.yml
+.travis.yml
+.circleci/
+
+# Database
+*.sql
+*.db
+*.sqlite
+migrations/
+seeds/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
