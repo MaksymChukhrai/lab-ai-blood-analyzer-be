@@ -26,7 +26,7 @@ Your task:
 
 2. Summarize the overall health based on the blood markers.
 
-3. Respond directly to the user's question or note (if any).
+3. Explain the symptoms of {comment} in a way that someone without a medical background can understand. Include the typical timeline for symptom progression.
 
 4. Generate personalized recommendations based only on selected types {options}:
    - If Supplements (vitamins, minerals)

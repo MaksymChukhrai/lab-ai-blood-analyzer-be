@@ -25,6 +25,7 @@ export interface CacheOperationResult {
   message: string;
   saved: boolean;
   id: string;
+  analysis?: MedicalDataCheck;
 }
 
 export interface ClearCachedDataResult {
@@ -68,6 +69,7 @@ export class UploadService {
         message: UPLOAD_MESSAGES.SUCCESS,
         saved: true,
         id: newRecord.id,
+        analysis: analysis,
       };
     } catch (error: unknown) {
       throw new InternalServerErrorException(UPLOAD_MESSAGES.FAILED, error);
