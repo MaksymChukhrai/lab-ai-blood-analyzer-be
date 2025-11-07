@@ -18,8 +18,12 @@ export class HealthController {
         swagger: '/api',
         health: '/health',
         auth: {
+          google: 'GET /auth/google',
+          linkedin: 'GET /auth/linkedin',
+          magicLink: 'POST /auth/magic-link/request',
           refresh: 'POST /auth/refresh',
           logout: 'POST /auth/logout',
+          profile: 'GET /auth/profile',
         },
       },
     };
@@ -34,7 +38,7 @@ export class HealthController {
       uptime: process.uptime(),
       timestamp: new Date().toISOString(),
       environment: process.env.NODE_ENV || 'development',
-      database: 'mock',
+      database: 'connected',
     };
   }
 }

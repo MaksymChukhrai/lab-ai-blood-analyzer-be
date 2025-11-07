@@ -1,21 +1,77 @@
-## ⚠️ Database Setup (Pending)
+## 🔐 OAuth Authentication
 
-Database connection is temporarily disabled in `app.module.ts` until MySQL is configured by DevOps.
+### Supported Providers
+- ✅ Google OAuth 2.0
+- ✅ LinkedIn OpenID Connect
+- ✅ Magic Link (email-based passwordless)
 
-**Current Status:**
-- ✅ JWT authentication infrastructure ready
-- ✅ User entity and migration prepared
-- ⏳ Waiting for MySQL database setup
+### Setup Instructions
 
-**To enable database:**
-1. Create MySQL database and user
-2. Update `.env` with correct credentials
-3. Uncomment TypeORM configuration in `app.module.ts`
-4. Run migrations
+#### Prerequisites
+1. Copy `.env.example` to `.env`
+2. Fill in OAuth credentials
+3. Install dependencies: `npm install`
 
-**Related files:**
-- `src/modules/auth/user.entity.ts` - User entity
-- `src/migrations/CreateUsersTable.ts` - Database migration
+#### Google OAuth Setup
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create OAuth 2.0 Client ID
+3. Add authorized redirect URI: `http://localhost:3000/api/auth/google/callback`
+4. Copy Client ID and Client Secret to `.env`
+
+#### LinkedIn OAuth Setup
+1. Go to [LinkedIn Developers](https://www.linkedin.com/developers/apps)
+2. Create a new app
+3. Enable "Sign In with LinkedIn using OpenID Connect"
+4. Add redirect URL: `http://localhost:3000/api/auth/linkedin/callback`
+5. Copy Client ID and Client Secret to `.env`
+
+### Environment Variables
+```env
+# Google OAuth
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+GOOGLE_CALLBACK_URL=http://localhost:3000/api/auth/google/callback
+
+# LinkedIn OAuth
+LINKEDIN_CLIENT_ID=your-linkedin-client-id
+LINKEDIN_CLIENT_SECRET=your-linkedin-client-secret
+LINKEDIN_CALLBACK_URL=http://localhost:3000/api/auth/linkedin/callback
+
+# Frontend
+FRONTEND_URL=http://localhost:5173
+
+#### Testing
+```bash
+# Start development server
+npm run start:dev
+
+# Open in browser
+http://localhost:3000/api/auth/google
+http://localhost:3000/api/auth/linkedin
+
+# API Documentation (Swagger)
+http://localhost:3000/api/docs
+```
+#### Response Format
+After successful authentication, user will be redirected to:
+`http://localhost:5173/auth/callback?access_token=JWT_TOKEN&refresh_token=JWT_TOKEN`
+
+#### Database
+Currently using MySQL for development.
+
+#### Database
+**MySQL** ready for production.
+
+**Development:**
+- SQLite database: `./lab_ai_dev.sqlite`
+- No setup required, auto-created on first run
+
+**Production (Docker):**
+- MySQL 8.0 container configured
+- Connection via `.env` variables
+- Migrations run automatically on startup
+
+---
 
 ## Description
 
@@ -41,66 +97,20 @@ $ npm run start:prod
 ```
 
 ## Run tests
-
 ```bash
-# unit tests
-$ npm run test
+unit tests
+npm run test
 
-# e2e tests
-$ npm run test:e2e
+e2e tests
+npm run test:e2e
 
-# test coverage
-$ npm run test:cov
-
+test coverage
+npm run test:cov
 ```
 
-## 🐳 Docker
-
-Backend containerized with **Docker**.   
-Quick start:
-
+## Docker
+Backend containerized with Docker.
 ```bash
 docker-compose up -d
 ```
-
-Full documentation: [docs/DOCKER.md](docs/DOCKER.md)
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+Full documentation: [docs/DOCKER.md](https://github.com/ZenBit-Tech/green_be/blob/develop/docs/DOCKER.md)

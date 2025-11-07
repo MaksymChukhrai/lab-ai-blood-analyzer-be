@@ -1,198 +1,244 @@
 import {
   Injectable,
-  InternalServerErrorException,
-  NotFoundException,
-  UnauthorizedException,
   Logger,
+  BadRequestException,
+  UnauthorizedException,
+  NotFoundException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
-import { JwtService as NestJwtService } from '@nestjs/jwt';
+import { Repository, DataSource, LessThan } from 'typeorm';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import { v4 as uuidv4 } from 'uuid';
-
-import { EmailService } from '@common/services/email.service';
-import { JwtPayload } from '@app-types/jwt-payload.interface';
-import { AuthResponseDto } from './dto/auth-response.dto';
-import { ResponseMagicLinkDto } from './dto/response-magic-link.dto';
-import { MagicLinkTokenEntity } from './entities/magic-link-token.entity';
 import { UserEntity } from './entities/user.entity';
+import { MagicLinkTokenEntity } from './entities/magic-link-token.entity';
+import { AuthResponseDto } from './dto/auth-response.dto';
+import { OAuthProfile } from '@app-types/oauth-profile.interface';
+import { JwtPayload } from '@app-types/jwt-payload.interface';
+import { EmailService } from '@common/services/email.service';
+import { UserResponseDto } from './dto/user-response.dto';
 
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
 
-  public constructor(
-    private readonly configService: ConfigService,
+  constructor(
     @InjectRepository(UserEntity)
-    private readonly userRepo: Repository<UserEntity>,
+    private readonly userRepository: Repository<UserEntity>,
     @InjectRepository(MagicLinkTokenEntity)
-    private readonly tokenRepo: Repository<MagicLinkTokenEntity>,
+    private readonly tokenRepository: Repository<MagicLinkTokenEntity>,
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
     private readonly dataSource: DataSource,
     private readonly emailService: EmailService,
-    private readonly jwtService: NestJwtService,
   ) {}
 
-  public async requestMagicLink(
-    emailAddress: string,
-  ): Promise<ResponseMagicLinkDto> {
+  async handleOAuthLogin(profile: OAuthProfile): Promise<AuthResponseDto> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
     try {
-      const token = uuidv4();
-      const nowSeconds = Math.floor(Date.now() / 1000);
-      const expirySeconds = this.configService.get<number>(
-        'MAGIC_LINK_EXPIRY_SECONDS',
-      );
-      const expiresAt = nowSeconds + expirySeconds;
-
-      await this.dataSource.transaction(async (manager) => {
-        let userFound = await manager.findOne(UserEntity, {
-          where: { email: emailAddress },
-        });
-
-        if (!userFound) {
-          userFound = manager.create(UserEntity, {
-            email: emailAddress,
-            provider: 'magic_link',
-          });
-          await manager.save(UserEntity, userFound);
-        }
-
-        const tokenEntity = manager.create(MagicLinkTokenEntity, {
-          token,
-          user: userFound,
-          expiresAt,
-        });
-
-        await manager.save(MagicLinkTokenEntity, tokenEntity);
+      let user = await queryRunner.manager.findOne(UserEntity, {
+        where: [
+          { email: profile.email, provider: profile.provider },
+          { providerId: profile.providerId, provider: profile.provider },
+        ],
       });
 
-      const backendUrl = this.configService.get<string>('BACKEND_URL');
-      const link = `${backendUrl}/auth/magic-link/consume?token=${token}`;
-      const from = this.configService.get<string>('EMAIL_FROM');
-
-      await this.emailService.sendMagicLink({
-        to: emailAddress,
-        from,
-        link,
-        expiresInSeconds: expirySeconds,
-      });
-
-      return { success: true };
-    } catch (err) {
-      this.logger.error('requestMagicLink failed', (err as Error).message);
-      throw new InternalServerErrorException(
-        'Failed to process magic link request',
-      );
-    }
-  }
-
-  public async consumeMagicLink(token: string): Promise<AuthResponseDto> {
-    try {
-      const nowSeconds = Math.floor(Date.now() / 1000);
-
-      const tokenEntity = await this.tokenRepo.findOne({
-        where: { token },
-        relations: ['user'],
-      });
-
-      if (!tokenEntity) {
-        throw new NotFoundException('Magic link not found or already used');
-      }
-
-      if (tokenEntity.expiresAt < nowSeconds) {
-        await this.tokenRepo.delete({ id: tokenEntity.id });
-        throw new UnauthorizedException('Magic link expired');
-      }
-
-      const user = tokenEntity.user;
       if (!user) {
-        throw new NotFoundException('User not found for this magic link');
+        user = queryRunner.manager.create(UserEntity, {
+          ...profile,
+        });
+      } else {
+        user.firstName = profile.firstName || user.firstName;
+        user.lastName = profile.lastName || user.lastName;
+        user.picture = profile.picture || user.picture;
       }
 
-      await this.tokenRepo.delete({ id: tokenEntity.id });
+      const tokens = this.generateTokens(user);
+      user.refreshToken = tokens.refreshToken;
+      await queryRunner.manager.save(user);
 
-      const tokens = await this.generateTokens(user);
-
-      await this.userRepo.update(user.id, {
-        refreshToken: tokens.refreshToken,
-      });
-
-      const expiresIn = this.configService.get<number>(
-        'JWT_EXPIRES_IN_SECONDS',
-      );
+      await queryRunner.commitTransaction();
 
       return {
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
-        expiresIn,
-        user: user,
+        expiresIn: this.configService.getOrThrow<number>(
+          'JWT_EXPIRES_IN_SECONDS',
+        ),
+        user: new UserResponseDto(user),
       };
-    } catch (err) {
-      this.logger.error('consumeMagicLink failed', (err as Error).message);
-      throw err;
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      this.logger.error(
+        `OAuth login failed for ${profile.email}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+      throw error;
+    } finally {
+      await queryRunner.release();
     }
   }
 
-  public async refresh(
+  async requestMagicLink(email: string): Promise<void> {
+    try {
+      const token = uuidv4();
+      const expirySeconds = this.configService.get<number>(
+        'MAGIC_LINK_EXPIRY_SECONDS',
+        900,
+      );
+      const expiresAt = Date.now() + expirySeconds * 1000;
+
+      let user = await this.userRepository.findOne({
+        where: { email },
+      });
+
+      if (!user) {
+        user = this.userRepository.create({
+          email,
+          provider: 'magic_link',
+        });
+        await this.userRepository.save(user);
+      }
+
+      await this.tokenRepository.delete({
+        user: { id: user.id },
+        expiresAt: LessThan(Date.now()),
+      });
+
+      const magicLinkToken = this.tokenRepository.create({
+        token,
+        user,
+        expiresAt,
+      });
+
+      await this.tokenRepository.save(magicLinkToken);
+
+      const backendUrl = this.configService.getOrThrow<string>('BACKEND_URL');
+      const magicLink = `${backendUrl}/auth/magic-link/consume?token=${token}`;
+      const emailFrom = this.configService.getOrThrow<string>('EMAIL_FROM');
+
+      await this.emailService.sendMagicLink({
+        to: email,
+        from: emailFrom,
+        link: magicLink,
+        expiresInSeconds: expirySeconds,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to send magic link: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+      throw new BadRequestException('Failed to send magic link');
+    }
+  }
+
+  async consumeMagicLink(token: string): Promise<AuthResponseDto> {
+    const magicLinkToken = await this.tokenRepository.findOne({
+      where: { token },
+      relations: ['user'],
+    });
+
+    if (!magicLinkToken) {
+      throw new UnauthorizedException('Invalid magic link token');
+    }
+
+    if (magicLinkToken.expiresAt < Date.now()) {
+      throw new UnauthorizedException('Magic link token expired');
+    }
+
+    const user = magicLinkToken.user;
+    const tokens = this.generateTokens(user);
+
+    user.refreshToken = tokens.refreshToken;
+    await this.userRepository.save(user);
+
+    await this.tokenRepository.delete({ id: magicLinkToken.id });
+
+    const expiresIn = this.configService.getOrThrow<number>(
+      'JWT_EXPIRES_IN_SECONDS',
+    );
+
+    return {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      expiresIn,
+      user: new UserResponseDto(user),
+    };
+  }
+
+  async refresh(
     refreshToken: string,
   ): Promise<{ accessToken: string; refreshToken: string }> {
     try {
       const payload = this.jwtService.verify<JwtPayload>(refreshToken, {
-        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+        secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
       });
 
-      const user = await this.userRepo.findOne({
+      const user = await this.userRepository.findOne({
         where: { id: payload.sub },
       });
 
-      if (!user || !user.refreshToken) {
+      if (!user || user.refreshToken !== refreshToken) {
         throw new UnauthorizedException('Invalid refresh token');
       }
 
-      if (user.refreshToken !== refreshToken) {
-        throw new UnauthorizedException('Invalid refresh token');
-      }
-
-      const tokens = await this.generateTokens(user);
-
-      await this.userRepo.update(user.id, {
-        refreshToken: tokens.refreshToken,
-      });
+      const tokens = this.generateTokens(user);
+      user.refreshToken = tokens.refreshToken;
+      await this.userRepository.save(user);
 
       return {
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
       };
-    } catch {
-      throw new UnauthorizedException('Invalid or expired refresh token');
+    } catch (error) {
+      this.logger.error(
+        `Token refresh failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+      throw new UnauthorizedException('Invalid refresh token');
     }
   }
 
-  public async logout(id: string): Promise<{ message: string }> {
-    await this.userRepo.update(id, { refreshToken: null });
+  async logout(userId: string): Promise<{ message: string }> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    user.refreshToken = null;
+    await this.userRepository.save(user);
+
     return { message: 'Logged out successfully' };
   }
 
-  public async generateTokens(
-    user: UserEntity,
-  ): Promise<{ accessToken: string; refreshToken: string }> {
+  private generateTokens(user: UserEntity): {
+    accessToken: string;
+    refreshToken: string;
+  } {
     const payload: JwtPayload = {
       sub: user.id,
     };
 
-    const [accessToken, refreshToken] = await Promise.all([
-      this.jwtService.signAsync(payload, {
-        secret: this.configService.get<string>('JWT_SECRET'),
-        expiresIn: this.configService.get<string>('JWT_EXPIRES_IN_SECONDS'),
-      }),
-      this.jwtService.signAsync(payload, {
-        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
-        expiresIn: this.configService.get<string>(
-          'JWT_REFRESH_EXPIRES_IN_SECONDS',
-        ),
-      }),
-    ]);
+    const accessToken = this.jwtService.sign(payload, {
+      secret: this.configService.getOrThrow<string>('JWT_SECRET'),
+      expiresIn: this.configService.getOrThrow<number>(
+        'JWT_EXPIRES_IN_SECONDS',
+      ),
+    });
 
-    return { accessToken, refreshToken };
+    const refreshToken = this.jwtService.sign(payload, {
+      secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
+      expiresIn: this.configService.getOrThrow<number>(
+        'JWT_REFRESH_EXPIRES_IN_SECONDS',
+      ),
+    });
+
+    return {
+      accessToken,
+      refreshToken,
+    };
   }
 }

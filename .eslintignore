@@ -1,0 +1,6 @@
+node_modules/
+dist/
+*.js
+scripts/
+src/modules/auth/strategies/
+typeorm.config.tssrc/modules/langchain/**

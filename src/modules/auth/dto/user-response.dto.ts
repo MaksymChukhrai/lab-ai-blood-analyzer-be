@@ -9,11 +9,28 @@ export class UserResponseDto {
   public email: string;
 
   @ApiProperty({
-    example: 'google',
-    enum: ['google', 'linkedin', 'magic_link'],
+    example: 'John',
     required: false,
   })
-  public provider?: string;
+  public firstName?: string;
+
+  @ApiProperty({
+    example: 'Doe',
+    required: false,
+  })
+  public lastName?: string;
+
+  @ApiProperty({
+    example: 'https://example.com/avatar.jpg',
+    required: false,
+  })
+  public picture?: string;
+
+  @ApiProperty({
+    example: 'google',
+    enum: ['magic_link', 'google', 'linkedin'],
+  })
+  public provider: 'magic_link' | 'google' | 'linkedin';
 
   @ApiProperty({ example: '2024-01-01T00:00:00.000Z' })
   public createdAt: Date;
@@ -21,6 +38,9 @@ export class UserResponseDto {
   constructor(user: UserEntity) {
     this.id = user.id;
     this.email = user.email;
+    this.firstName = user.firstName;
+    this.lastName = user.lastName;
+    this.picture = user.picture;
     this.provider = user.provider;
     this.createdAt = user.createdAt;
   }

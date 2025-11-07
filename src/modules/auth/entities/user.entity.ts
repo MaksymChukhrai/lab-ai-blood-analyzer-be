@@ -1,28 +1,43 @@
 import {
+  Entity,
+  PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
-  Entity,
+  UpdateDateColumn,
   Index,
-  PrimaryGeneratedColumn,
 } from 'typeorm';
-import { Exclude } from 'class-transformer';
 
-@Entity({ name: 'users' })
+@Entity('users')
 export class UserEntity {
   @PrimaryGeneratedColumn('uuid')
-  public id: string;
+  id: string;
 
-  @Index({ unique: true })
-  @Column()
-  public email: string;
+  @Column({ unique: true })
+  @Index()
+  email: string;
 
-  @Column({ nullable: true })
-  @Exclude()
-  refreshToken: string | null;
+  @Column({ type: 'varchar', length: 50 })
+  provider: 'magic_link' | 'google' | 'linkedin';
 
-  @CreateDateColumn()
+  @Column({ name: 'provider_id', type: 'varchar', nullable: true })
+  @Index()
+  providerId?: string;
+
+  @Column({ name: 'first_name', type: 'varchar', nullable: true })
+  firstName?: string;
+
+  @Column({ name: 'last_name', type: 'varchar', nullable: true })
+  lastName?: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  picture?: string;
+
+  @Column({ name: 'refresh_token', type: 'text', nullable: true })
+  refreshToken?: string;
+
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
-  @Column({ nullable: true })
-  public provider?: string;
+  @UpdateDateColumn({ name: 'updated_at' })
+  updatedAt: Date;
 }

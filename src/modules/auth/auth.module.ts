@@ -1,17 +1,18 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
+import { ConfigModule } from '@nestjs/config';
+import { AuthService } from '@modules/auth/auth.service';
+import { AuthController } from '@modules/auth/auth.controller';
+import { UserEntity } from '@modules/auth/entities/user.entity';
+import { MagicLinkTokenEntity } from '@modules/auth/entities/magic-link-token.entity';
+import { GoogleStrategy } from '@modules/auth/strategies/google.strategy';
+import { LinkedInStrategy } from '@modules/auth/strategies/linkedin.strategy';
+import { JwtStrategy } from '@modules/auth/strategies/jwt.strategy';
+import { JwtRefreshStrategy } from '@modules/auth/strategies/jwt-refresh.strategy';
+import { JwtAuthGuard } from '@modules/auth/guards/jwt-auth.guard';
 import { EmailService } from '@common/services/email.service';
-import { AuthService } from './auth.service';
-import { AuthController } from './auth.controller';
-import { UserEntity } from './entities/user.entity';
-import { MagicLinkTokenEntity } from './entities/magic-link-token.entity';
-import { JwtStrategy } from './strategies/jwt.strategy';
-import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 /**
  * Authentication Module
@@ -20,6 +21,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
  * Features:
  * - JWT access and refresh token management
  * - Magic Link passwordless authentication
+ * - OAuth (Google, LinkedIn)
  * - Global authentication guard with @Public() decorator support
  * - Passport strategies for token validation
  * - User entity and TypeORM integration
@@ -28,16 +30,8 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
   imports: [
     TypeOrmModule.forFeature([UserEntity, MagicLinkTokenEntity]),
     PassportModule,
-    JwtModule.registerAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET'),
-        signOptions: {
-          expiresIn: configService.get<string>('JWT_EXPIRES_IN_SECONDS'),
-        },
-      }),
-    }),
+    JwtModule.register({}),
+    ConfigModule,
   ],
   controllers: [AuthController],
   providers: [
@@ -45,11 +39,10 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
     EmailService,
     JwtStrategy,
     JwtRefreshStrategy,
-    {
-      provide: APP_GUARD,
-      useClass: JwtAuthGuard,
-    },
+    JwtAuthGuard,
+    GoogleStrategy,
+    LinkedInStrategy,
   ],
-  exports: [AuthService, JwtModule],
+  exports: [AuthService, JwtAuthGuard, JwtModule],
 })
 export class AuthModule {}
