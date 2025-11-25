@@ -8,6 +8,8 @@ import {
   Query,
   Get,
   Res,
+  Req,
+  Logger,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
@@ -16,8 +18,9 @@ import {
   ApiTags,
   ApiBearerAuth,
   ApiResponse,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { Response } from 'express';
+import { Response, Request } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { RequestMagicLinkDto } from './dto/request-magic-link.dto';
 import { AuthService } from './auth.service';
@@ -30,12 +33,15 @@ import { Public } from './decorators/public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { UserEntity } from './entities/user.entity';
 import { JwtRefreshAuthGuard } from './guards/jwt-refresh-auth.guard';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { GoogleOAuthGuard } from './guards/google-oauth.guard';
 import { LinkedInOAuthGuard } from './guards/linkedin-oauth.guard';
 
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+
   public constructor(
     private readonly authService: AuthService,
     private readonly configService: ConfigService,
@@ -135,6 +141,10 @@ export class AuthController {
   @UseGuards(JwtRefreshAuthGuard)
   @Post('refresh')
   @ApiOperation({ summary: 'Refresh access token' })
+  @ApiOkResponse({
+    description: 'New access and refresh tokens',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid refresh token' })
   async refresh(
     @Body() dto: RefreshTokenDto,
   ): Promise<{ accessToken: string; refreshToken: string }> {
@@ -142,15 +152,60 @@ export class AuthController {
   }
 
   @Post('logout')
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'User logout' })
-  async logout(@CurrentUser() user: UserEntity): Promise<{ message: string }> {
-    return this.authService.logout(user.id);
+  @ApiOkResponse({
+    description: 'Successfully logged out',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Logged out successfully' },
+      },
+    },
+  })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  async logout(
+    @CurrentUser() user: UserEntity,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<{ message: string }> {
+    const result = await this.authService.logout(user.id);
+
+    if (req.session) {
+      req.session.destroy((err) => {
+        if (err) {
+          this.logger.error(
+            `Session destroy failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
+          );
+        } else {
+          this.logger.log('Session destroyed successfully');
+        }
+      });
+    }
+
+    res.clearCookie('connect.sid', {
+      path: '/',
+      httpOnly: true,
+      secure: this.configService.get<string>('NODE_ENV') === 'production',
+      sameSite: 'strict',
+    });
+
+    this.logger.log(
+      `User ${user.id} (${user.email}) logged out, connect.sid cleared`,
+    );
+
+    return result;
   }
 
   @Get('profile')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get current user profile' })
+  @ApiOkResponse({
+    description: 'User profile',
+    type: UserResponseDto,
+  })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   getProfile(@CurrentUser() user: UserEntity): UserResponseDto {
     return new UserResponseDto(user);
   }

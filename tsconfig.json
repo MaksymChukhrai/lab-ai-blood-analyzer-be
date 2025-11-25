@@ -18,6 +18,8 @@
     "strict": true,
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": false,
+    "types": ["jest", "node"],
+    "esModuleInterop": true,
     "paths": {
       "@/*": ["src/*"],
       "@app-types/*": ["src/types/*"],
@@ -25,6 +27,11 @@
       "@common/*": ["src/common/*"]
     }
   },
-  "exclude": ["node_modules", "dist", "test", "**/*spec.ts"],
-  "include": ["src/**/*.ts"]
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.spec.ts",
+    "jest.config.js",
+    ".eslintrc.js"
+  ],
+  "exclude": ["node_modules", "dist", "test"]
 }

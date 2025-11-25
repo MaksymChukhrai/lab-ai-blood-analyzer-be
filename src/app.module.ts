@@ -2,10 +2,12 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 import { AuthModule } from '@modules/auth/auth.module';
 import { HealthModule } from '@modules/health/health.module';
 import { AnalysisModule } from '@modules/analysis/analysis.module';
 import { UploadModule } from '@modules/upload/upload.module';
+import { JwtAuthGuard } from '@modules/auth/guards/jwt-auth.guard';
 import { envValidationSchema } from '@/config/env.validation';
 
 @Module({
@@ -42,6 +44,12 @@ import { envValidationSchema } from '@/config/env.validation';
     HealthModule,
     AnalysisModule,
     UploadModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
   ],
 })
 export class AppModule {}
