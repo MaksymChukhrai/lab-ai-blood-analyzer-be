@@ -63,8 +63,9 @@ Currently using MySQL for development.
 **MySQL** ready for production.
 
 **Development:**
-- SQLite database: `./lab_ai_dev.sqlite`
-- No setup required, auto-created on first run
+- MySQL 8.0 via Docker Compose
+- Auto-configured with default credentials
+- Database name: `lab_ai_db`
 
 **Production (Docker):**
 - MySQL 8.0 container configured
