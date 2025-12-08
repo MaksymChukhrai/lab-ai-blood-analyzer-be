@@ -46,10 +46,11 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, document);
 
-  const allowedOrigins = [
-    'http://localhost:5173',
-    'https://green-frontend-bbac1a42fc92.herokuapp.com',
-  ];
+  const allowedOriginsEnv = config.getOrThrow<string>('ALLOWED_ORIGINS');
+  const allowedOrigins = allowedOriginsEnv
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
 
   if (frontendUrl && !allowedOrigins.includes(frontendUrl)) {
     allowedOrigins.push(frontendUrl);
