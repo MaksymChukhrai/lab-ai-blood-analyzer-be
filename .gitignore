@@ -44,7 +44,7 @@ lerna-debug.log*
 .env.docker.local
 
 # Database files
-
+*.sqlite
 *.db
 
 # temp directory
