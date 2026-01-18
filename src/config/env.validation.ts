@@ -34,18 +34,31 @@ export const envValidationSchema = Joi.object({
 
   GOOGLE_CLIENT_ID: Joi.string().required(),
   GOOGLE_CLIENT_SECRET: Joi.string().required(),
-  GOOGLE_CALLBACK_URL: Joi.string().uri().required(),
+  GOOGLE_CALLBACK_URL: Joi.string()
+    .uri()
+    .allow('')
+    .default('http://localhost:3000/api/auth/google/callback')
+    .description('Google OAuth callback URL'),
 
   LINKEDIN_CLIENT_ID: Joi.string().required(),
   LINKEDIN_CLIENT_SECRET: Joi.string().required(),
-  LINKEDIN_CALLBACK_URL: Joi.string().uri().required(),
+  LINKEDIN_CALLBACK_URL: Joi.string()
+    .uri()
+    .allow('')
+    .default('http://localhost:3000/api/auth/linkedin/callback')
+    .description('LinkedIn OAuth callback URL'),
 
   SESSION_SECRET: Joi.string().required(),
 
-  FRONTEND_URL: Joi.string().uri().required(),
+  FRONTEND_URL: Joi.string()
+    .uri()
+    .allow('')
+    .default('http://localhost:5173')
+    .description('Frontend application URL'),
 
   ALLOWED_ORIGINS: Joi.string()
-    .required()
+    .optional()
+    .default('http://localhost:5173')
     .custom((value: unknown, helpers) => {
       if (typeof value !== 'string') {
         return helpers.error('string.base');
@@ -75,7 +88,6 @@ export const envValidationSchema = Joi.object({
     }, 'CORS origins validation')
     .messages({
       'string.base': 'ALLOWED_ORIGINS must be a string',
-      'any.required': 'ALLOWED_ORIGINS is required',
       'any.invalid': 'ALLOWED_ORIGINS must be comma-separated valid URIs',
     }),
 
