@@ -21,6 +21,7 @@ export const envValidationSchema = Joi.object({
   MAGIC_LINK_EXPIRY_SECONDS: Joi.number().default(900),
   BACKEND_URL: Joi.string()
     .uri()
+    .allow('')
     .optional()
     .default('http://localhost:3000/api')
     .description('Backend base URL for email links'),
