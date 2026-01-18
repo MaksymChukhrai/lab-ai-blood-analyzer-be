@@ -24,6 +24,9 @@ RUN npm install --ignore-scripts && \
 # Copy source code
 COPY . .
 
+# ✅ Удаляем dist перед стартом (на случай локальной сборки)
+RUN rm -rf dist
+
 # Expose port
 EXPOSE 3000
 
@@ -33,5 +36,5 @@ CMD ["npm", "run", "start:dev"]
 
 # Metadata
 LABEL maintainer="mchukhrai@zenbit.tech" \
-      version="1.0.0-dev" \
+      version="1.0.1-dev" \
       description="Blood Test Analyzer Backend - Development"

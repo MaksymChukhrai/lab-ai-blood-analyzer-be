@@ -26,13 +26,10 @@ RUN npm ci --ignore-scripts && \
 # Copy source code
 COPY . .
 
-RUN rm -rf dist
-
-# Build application
-RUN npm run build
-
-# Remove devDependencies
-RUN npm prune --production && \
+# ✅ ОБЪЕДИНЯЕМ команды для ломки кэша
+RUN rm -rf dist && \
+    npm run build && \
+    npm prune --production && \
     npm cache clean --force
 
 # ========================================
@@ -76,6 +73,6 @@ CMD ["node", "dist/main.js"]
 
 # Metadata
 LABEL maintainer="mchukhrai@zenbit.tech" \
-      version="1.0.0" \
+      version="1.0.1" \
       description="Blood Test Analyzer Backend - Production" \
-      org.opencontainers.image.source="https://github.com/ZenBit-Tech/green_be"
+      org.opencontainers.image.source="https://github.com/MaksymChukhrai/lab-ai-blood-analyzer-be"
