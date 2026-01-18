@@ -32,16 +32,16 @@ export const envValidationSchema = Joi.object({
   SMTP_USER: Joi.string().required(),
   SMTP_PASS: Joi.string().required(),
 
-  GOOGLE_CLIENT_ID: Joi.string().required(),
-  GOOGLE_CLIENT_SECRET: Joi.string().required(),
+  // GOOGLE_CLIENT_ID: Joi.string().required(),
+  // GOOGLE_CLIENT_SECRET: Joi.string().required(),
   GOOGLE_CALLBACK_URL: Joi.string()
     .uri()
     .allow('')
     .default('http://localhost:3000/api/auth/google/callback')
     .description('Google OAuth callback URL'),
 
-  LINKEDIN_CLIENT_ID: Joi.string().required(),
-  LINKEDIN_CLIENT_SECRET: Joi.string().required(),
+  // LINKEDIN_CLIENT_ID: Joi.string().required(),
+  // LINKEDIN_CLIENT_SECRET: Joi.string().required(),
   LINKEDIN_CALLBACK_URL: Joi.string()
     .uri()
     .allow('')
