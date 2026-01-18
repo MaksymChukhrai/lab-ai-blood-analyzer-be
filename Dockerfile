@@ -26,6 +26,8 @@ RUN npm ci --ignore-scripts && \
 # Copy source code
 COPY . .
 
+RUN rm -rf dist
+
 # Build application
 RUN npm run build
 
