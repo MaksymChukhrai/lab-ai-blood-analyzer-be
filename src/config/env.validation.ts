@@ -19,7 +19,11 @@ export const envValidationSchema = Joi.object({
   JWT_REFRESH_EXPIRES_IN_SECONDS: Joi.number().default(604800),
 
   MAGIC_LINK_EXPIRY_SECONDS: Joi.number().default(900),
-  BACKEND_URL: Joi.string().uri().required(),
+  BACKEND_URL: Joi.string()
+    .uri()
+    .optional()
+    .default('http://localhost:3000/api')
+    .description('Backend base URL for email links'),
   EMAIL_FROM: Joi.string().email().required(),
 
   SMTP_HOST: Joi.string().required(),
