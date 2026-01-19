@@ -13,31 +13,30 @@ export class UserEntity {
   id: string;
 
   @Column({ unique: true })
-  @Index()
   email: string;
 
-  @Column({ type: 'varchar', length: 50 })
-  provider: 'magic_link' | 'google' | 'linkedin';
+  @Column({ length: 50 })
+  provider: string;
 
-  @Column({ name: 'provider_id', type: 'varchar', nullable: true })
   @Index()
-  providerId?: string;
+  @Column({ nullable: true })
+  providerId: string;
 
-  @Column({ name: 'first_name', type: 'varchar', nullable: true })
-  firstName?: string;
+  @Column({ nullable: true })
+  firstName: string;
 
-  @Column({ name: 'last_name', type: 'varchar', nullable: true })
-  lastName?: string;
+  @Column({ nullable: true })
+  lastName: string;
 
-  @Column({ type: 'varchar', nullable: true })
-  picture?: string;
+  @Column({ nullable: true })
+  picture: string;
 
-  @Column({ name: 'refresh_token', type: 'text', nullable: true })
-  refreshToken?: string;
+  @Column({ type: 'text', nullable: true })
+  refreshToken: string;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn()
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn()
   updatedAt: Date;
 }
