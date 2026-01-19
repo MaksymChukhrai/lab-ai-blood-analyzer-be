@@ -106,17 +106,7 @@ export class AuthController {
 
     res.redirect(redirectUrl);
   }
-
-  @Public()
-  @Get('linkedin')
-  @UseGuards(LinkedInOAuthGuard)
-  @ApiOperation({ summary: 'Initiate LinkedIn OAuth flow' })
-  @ApiResponse({
-    status: HttpStatus.FOUND,
-    description: 'Redirects to LinkedIn authorization page',
-  })
-  public async linkedinAuth(): Promise<void> {}
-
+  // ============================================Linkedin OAuth============================================
   @Public()
   @Get('linkedin/callback')
   @UseGuards(LinkedInOAuthGuard)
@@ -129,13 +119,34 @@ export class AuthController {
     @CurrentUser() profile: OAuthProfile,
     @Res() res: Response,
   ): Promise<void> {
-    const authResponse = await this.authService.handleOAuthLogin(profile);
+    try {
+      // 🔍 DEBUG: Логируем полученный профиль
+      this.logger.debug('LinkedIn callback - received profile:', profile);
 
-    const frontendUrl = this.configService.get<string>('FRONTEND_URL');
-    const redirectUrl = `${frontendUrl}/auth/callback?access_token=${authResponse.accessToken}&refresh_token=${authResponse.refreshToken}`;
+      const authResponse = await this.authService.handleOAuthLogin(profile);
 
-    res.redirect(redirectUrl);
+      // 🔍 DEBUG: Логируем успешную генерацию токенов
+      this.logger.debug('LinkedIn callback - tokens generated successfully');
+
+      const frontendUrl = this.configService.get<string>('FRONTEND_URL');
+      const redirectUrl = `${frontendUrl}/auth/callback?access_token=${authResponse.accessToken}&refresh_token=${authResponse.refreshToken}`;
+
+      this.logger.debug('LinkedIn callback - redirecting to:', frontendUrl);
+      res.redirect(redirectUrl);
+    } catch (error) {
+      // 🔍 DEBUG: Логируем ошибку
+      this.logger.error('LinkedIn callback error:', error);
+
+      const frontendUrl = this.configService.get<string>('FRONTEND_URL');
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      const errorRedirectUrl = `${frontendUrl}/auth/error?message=${encodeURIComponent(errorMessage)}`;
+
+      res.redirect(errorRedirectUrl);
+    }
   }
+
+  // -------------------------------------------------end of LinkedIn OAuth-------------------------------------------------
 
   @Public()
   @UseGuards(JwtRefreshAuthGuard)

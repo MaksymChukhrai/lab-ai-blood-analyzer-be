@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy as OpenIDStrategy } from 'passport-openidconnect';
 import { ConfigService } from '@nestjs/config';
@@ -11,10 +11,19 @@ export class LinkedInStrategy extends PassportStrategy(
   OpenIDStrategy,
   'linkedin',
 ) {
+  private readonly logger = new Logger(LinkedInStrategy.name);
+
   constructor(configService: ConfigService) {
     const clientID = configService.get<string>('LINKEDIN_CLIENT_ID');
     const clientSecret = configService.get<string>('LINKEDIN_CLIENT_SECRET');
     const callbackURL = configService.get<string>('LINKEDIN_CALLBACK_URL');
+
+    // 🔍 DEBUG: Логируем конфиг (ВРЕМЕННО!)
+    console.log('🔑 LinkedIn Config:', {
+      clientID: clientID ? `${clientID.slice(0, 5)}...` : 'MISSING',
+      clientSecret: clientSecret ? 'SET' : 'MISSING',
+      callbackURL,
+    });
 
     super({
       issuer: 'https://www.linkedin.com/oauth',
@@ -35,7 +44,12 @@ export class LinkedInStrategy extends PassportStrategy(
     _issuer: string,
     profile: Record<string, unknown>,
   ): Promise<OAuthProfile> {
-    // Добавляем await для симуляции асинхронной операции
+    // 🔍 DEBUG: Логируем полученный профиль
+    this.logger.debug(
+      'LinkedIn profile received:',
+      JSON.stringify(profile, null, 2),
+    );
+
     await Promise.resolve();
 
     const id = (profile.id || profile.sub) as string;
@@ -44,17 +58,28 @@ export class LinkedInStrategy extends PassportStrategy(
       | { givenName?: string; familyName?: string }
       | undefined;
 
+    // 🔍 DEBUG: Логируем извлеченные данные
+    this.logger.debug('Extracted data:', {
+      id,
+      email: emails?.[0]?.value,
+      name,
+    });
+
     if (!id) {
+      this.logger.error('LinkedIn profile missing id!');
       throw new Error('LinkedIn profile missing id');
     }
 
-    return {
-      provider: 'linkedin',
+    const result: OAuthProfile = {
+      provider: 'linkedin' as const, // ← Добавили "as const"
       providerId: id,
       email: emails?.[0]?.value || `${id}@linkedin.com`,
       firstName: name?.givenName || '',
       lastName: name?.familyName || '',
       picture: (profile.picture as string) || null,
     };
+
+    this.logger.debug('Returning OAuthProfile:', result);
+    return result;
   }
 }
