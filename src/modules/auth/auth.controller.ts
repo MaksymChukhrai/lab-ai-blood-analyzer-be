@@ -108,6 +108,18 @@ export class AuthController {
   }
   // ============================================Linkedin OAuth============================================
   @Public()
+  @Get('linkedin')
+  @UseGuards(LinkedInOAuthGuard)
+  @ApiOperation({ summary: 'Initiate LinkedIn OAuth flow' })
+  @ApiResponse({
+    status: HttpStatus.FOUND,
+    description: 'Redirects to LinkedIn authorization page',
+  })
+  public async linkedinAuth(): Promise<void> {
+    // Passport автоматически обрабатывает редирект на LinkedIn
+  }
+
+  @Public()
   @Get('linkedin/callback')
   @UseGuards(LinkedInOAuthGuard)
   @ApiOperation({ summary: 'LinkedIn OAuth callback' })
@@ -145,7 +157,6 @@ export class AuthController {
       res.redirect(errorRedirectUrl);
     }
   }
-
   // -------------------------------------------------end of LinkedIn OAuth-------------------------------------------------
 
   @Public()
