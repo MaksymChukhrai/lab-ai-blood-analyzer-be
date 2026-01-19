@@ -36,7 +36,7 @@ export class LinkedInStrategy extends PassportStrategy(
       scope: ['openid', 'profile', 'email'],
       passReqToCallback: false,
       store: false,
-      state: true,
+      state: false, // ← ИЗМЕНИЛИ: Временно отключили state verification
     } as Record<string, unknown>);
   }
 
@@ -71,7 +71,7 @@ export class LinkedInStrategy extends PassportStrategy(
     }
 
     const result: OAuthProfile = {
-      provider: 'linkedin' as const, // ← Добавили "as const"
+      provider: 'linkedin' as const,
       providerId: id,
       email: emails?.[0]?.value || `${id}@linkedin.com`,
       firstName: name?.givenName || '',
