@@ -31,7 +31,13 @@ export class LinkedInStrategy extends PassportStrategy(
     } as Record<string, unknown>);
   }
 
-  validate(_issuer: string, profile: Record<string, unknown>): OAuthProfile {
+  async validate(
+    _issuer: string,
+    profile: Record<string, unknown>,
+  ): Promise<OAuthProfile> {
+    // Добавляем await для симуляции асинхронной операции
+    await Promise.resolve();
+
     const id = (profile.id || profile.sub) as string;
     const emails = profile.emails as Array<{ value: string }> | undefined;
     const name = profile.name as
