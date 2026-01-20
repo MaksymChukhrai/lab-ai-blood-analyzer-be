@@ -4,6 +4,8 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import session from 'express-session';
+import RedisStore from 'connect-redis';
+import { createClient } from 'redis';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -24,8 +26,37 @@ async function bootstrap() {
     }),
   );
 
+  // Redis client для session store
+  let sessionStore: session.Store | undefined;
+  const redisUrl = config.get<string>('REDIS_URL');
+
+  if (redisUrl) {
+    const redisClient = createClient({ url: redisUrl });
+
+    redisClient.on('error', (err: Error) => {
+      logger.error('Redis Client Error:', err.message);
+    });
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      await redisClient.connect();
+      sessionStore = new RedisStore({ client: redisClient });
+      logger.log('✅ Redis session store connected');
+    } catch (err: unknown) {
+      logger.warn('⚠️ Redis connection failed, falling back to memory store');
+      if (err instanceof Error) {
+        logger.warn(`Error details: ${err.message}`);
+      }
+    }
+  } else {
+    logger.warn(
+      '⚠️ REDIS_URL not set, using memory store (not production-ready)',
+    );
+  }
+
   app.use(
     session({
+      store: sessionStore,
       secret: config.getOrThrow<string>('SESSION_SECRET'),
       resave: false,
       saveUninitialized: false,
