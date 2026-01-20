@@ -30,7 +30,11 @@ async function bootstrap() {
   let sessionStore: session.Store | undefined;
   const redisUrl = config.get<string>('REDIS_URL');
 
+  logger.log(`🔍 Checking Redis configuration...`); // ← НОВОЕ
+  logger.log(`🔍 REDIS_URL exists: ${!!redisUrl}`); // ← НОВОЕ
+
   if (redisUrl) {
+    logger.log(`🔍 Attempting to connect to Redis...`); // ← НОВОЕ
     const redisClient = createClient({ url: redisUrl });
 
     redisClient.on('error', (err: Error) => {
