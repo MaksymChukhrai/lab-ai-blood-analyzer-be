@@ -38,8 +38,9 @@ async function bootstrap() {
     });
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      /* eslint-disable @typescript-eslint/no-unsafe-call */
       await redisClient.connect();
+      /* eslint-enable @typescript-eslint/no-unsafe-call */
       sessionStore = new RedisStore({ client: redisClient });
       logger.log('✅ Redis session store connected');
     } catch (err: unknown) {
