@@ -35,8 +35,8 @@ export class LinkedInStrategy extends PassportStrategy(
       callbackURL: callbackURL || '',
       scope: ['openid', 'profile', 'email'],
       passReqToCallback: false,
-      store: false,
-      state: false, // ← ИЗМЕНИЛИ: Временно отключили state verification
+      store: true, // ← ИЗМЕНИЛИ: вернул true
+      state: true, // ← ИЗМЕНИЛИ: вернул true
     } as Record<string, unknown>);
   }
 
