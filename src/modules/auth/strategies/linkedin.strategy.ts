@@ -18,7 +18,6 @@ export class LinkedInStrategy extends PassportStrategy(
     const clientSecret = configService.get<string>('LINKEDIN_CLIENT_SECRET');
     const callbackURL = configService.get<string>('LINKEDIN_CALLBACK_URL');
 
-    // 🔍 DEBUG: Логируем конфиг (ВРЕМЕННО!)
     console.log('🔑 LinkedIn Config:', {
       clientID: clientID ? `${clientID.slice(0, 5)}...` : 'MISSING',
       clientSecret: clientSecret ? 'SET' : 'MISSING',
@@ -35,8 +34,8 @@ export class LinkedInStrategy extends PassportStrategy(
       callbackURL: callbackURL || '',
       scope: ['openid', 'profile', 'email'],
       passReqToCallback: false,
-      store: true, // ← ИЗМЕНИЛИ: вернул true
-      state: true, // ← ИЗМЕНИЛИ: вернул true
+      state: false,
+      store: false,
     } as Record<string, unknown>);
   }
 
@@ -44,7 +43,6 @@ export class LinkedInStrategy extends PassportStrategy(
     _issuer: string,
     profile: Record<string, unknown>,
   ): Promise<OAuthProfile> {
-    // 🔍 DEBUG: Логируем полученный профиль
     this.logger.debug(
       'LinkedIn profile received:',
       JSON.stringify(profile, null, 2),
@@ -58,7 +56,6 @@ export class LinkedInStrategy extends PassportStrategy(
       | { givenName?: string; familyName?: string }
       | undefined;
 
-    // 🔍 DEBUG: Логируем извлеченные данные
     this.logger.debug('Extracted data:', {
       id,
       email: emails?.[0]?.value,
