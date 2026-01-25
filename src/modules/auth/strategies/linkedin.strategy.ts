@@ -1,82 +1,80 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
-import { Strategy as OpenIDStrategy } from 'passport-openidconnect';
+import { Strategy, VerifyCallback } from 'passport-oauth2';
 import { ConfigService } from '@nestjs/config';
 import { OAuthProfile } from '@app-types/oauth-profile.interface';
 
+interface LinkedInProfile {
+  sub: string;
+  name: string;
+  given_name: string;
+  family_name: string;
+  picture: string;
+  locale?: { country: string; language: string };
+  email: string;
+  email_verified: boolean;
+}
+
 @Injectable()
-export class LinkedInStrategy extends PassportStrategy(
-  OpenIDStrategy,
-  'linkedin',
-) {
-  private readonly logger = new Logger(LinkedInStrategy.name);
-
+export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
   constructor(configService: ConfigService) {
-    const clientID = configService.get<string>('LINKEDIN_CLIENT_ID');
-    const clientSecret = configService.get<string>('LINKEDIN_CLIENT_SECRET');
-    const callbackURL = configService.get<string>('LINKEDIN_CALLBACK_URL');
-
-    console.log('🔑 LinkedIn Config:', {
-      clientID: clientID ? `${clientID.slice(0, 5)}...` : 'MISSING',
-      clientSecret: clientSecret ? 'SET' : 'MISSING',
-      callbackURL,
-    });
-
     super({
-      issuer: 'https://www.linkedin.com/oauth',
       authorizationURL: 'https://www.linkedin.com/oauth/v2/authorization',
       tokenURL: 'https://www.linkedin.com/oauth/v2/accessToken',
-      userInfoURL: 'https://api.linkedin.com/v2/userinfo',
-      clientID: clientID || '',
-      clientSecret: clientSecret || '',
-      callbackURL: callbackURL || '',
+      clientID: configService.get<string>('LINKEDIN_CLIENT_ID'),
+      clientSecret: configService.get<string>('LINKEDIN_CLIENT_SECRET'),
+      callbackURL: configService.get<string>('LINKEDIN_CALLBACK_URL'),
       scope: ['openid', 'profile', 'email'],
-      passReqToCallback: false,
-      state: false,
-      store: false,
-    } as Record<string, unknown>);
+      state: true,
+    });
   }
 
   async validate(
-    _issuer: string,
-    profile: Record<string, unknown>,
-  ): Promise<OAuthProfile> {
-    this.logger.debug(
-      'LinkedIn profile received:',
-      JSON.stringify(profile, null, 2),
-    );
+    accessToken: string,
+    _refreshToken: string,
+    _profile: unknown,
+    done: VerifyCallback,
+  ): Promise<void> {
+    try {
+      // 🔍 Запрашиваем профиль LinkedIn через fetch
+      const response = await fetch('https://api.linkedin.com/v2/userinfo', {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-    await Promise.resolve();
+      if (!response.ok) {
+        throw new Error(`LinkedIn API error: ${response.status}`);
+      }
 
-    const id = (profile.id || profile.sub) as string;
-    const emails = profile.emails as Array<{ value: string }> | undefined;
-    const name = profile.name as
-      | { givenName?: string; familyName?: string }
-      | undefined;
+      const profile = (await response.json()) as LinkedInProfile;
+      console.log('✅ LinkedIn profile fetched:', profile);
 
-    this.logger.debug('Extracted data:', {
-      id,
-      email: emails?.[0]?.value,
-      name,
-    });
+      const user: OAuthProfile = {
+        provider: 'linkedin' as const,
+        providerId: profile.sub,
+        email: profile.email || `${profile.sub}@linkedin.com`,
+        firstName: profile.given_name || '',
+        lastName: profile.family_name || '',
+        picture: profile.picture || null,
+      };
 
-    if (!id) {
-      this.logger.error('LinkedIn profile missing id!');
-      throw new Error('LinkedIn profile missing id');
+      done(null, user);
+    } catch (error: unknown) {
+      console.error('❌ LinkedIn profile fetch failed:', error);
+
+      if (error instanceof Error) {
+        done(error, undefined);
+      } else {
+        done(
+          new Error('Unknown error during LinkedIn authentication'),
+          undefined,
+        );
+      }
     }
-
-    const result: OAuthProfile = {
-      provider: 'linkedin' as const,
-      providerId: id,
-      email: emails?.[0]?.value || `${id}@linkedin.com`,
-      firstName: name?.givenName || '',
-      lastName: name?.familyName || '',
-      picture: (profile.picture as string) || null,
-    };
-
-    this.logger.debug('Returning OAuthProfile:', result);
-    return result;
   }
 }
