@@ -1,4 +1,7 @@
-import { Injectable } from '@nestjs/common';
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+
+import { Injectable, Logger } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy, VerifyCallback } from 'passport-oauth2';
 import { ConfigService } from '@nestjs/config';
@@ -17,13 +20,27 @@ interface LinkedInProfile {
 
 @Injectable()
 export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
+  private readonly logger = new Logger(LinkedInStrategy.name);
+
   constructor(configService: ConfigService) {
+    const clientID = configService.get<string>('LINKEDIN_CLIENT_ID');
+    const clientSecret = configService.get<string>('LINKEDIN_CLIENT_SECRET');
+    const callbackURL = configService.get<string>('LINKEDIN_CALLBACK_URL');
+
+    // 🔍 DEBUG: Логируем конфигурацию
+    console.log('🔑 LinkedIn Strategy Config:', {
+      clientID: clientID ? `${clientID.slice(0, 5)}...` : 'MISSING',
+      clientSecret: clientSecret ? 'SET' : 'MISSING',
+      callbackURL: callbackURL || 'MISSING',
+      callbackURLLength: callbackURL?.length || 0,
+    });
+
     super({
       authorizationURL: 'https://www.linkedin.com/oauth/v2/authorization',
       tokenURL: 'https://www.linkedin.com/oauth/v2/accessToken',
-      clientID: configService.get<string>('LINKEDIN_CLIENT_ID'),
-      clientSecret: configService.get<string>('LINKEDIN_CLIENT_SECRET'),
-      callbackURL: configService.get<string>('LINKEDIN_CALLBACK_URL'),
+      clientID: clientID || '',
+      clientSecret: clientSecret || '',
+      callbackURL: callbackURL || '',
       scope: ['openid', 'profile', 'email'],
       state: true,
     });
@@ -35,8 +52,10 @@ export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
     _profile: unknown,
     done: VerifyCallback,
   ): Promise<void> {
+    this.logger.debug('LinkedIn validate called');
+    this.logger.debug('Access token exists: ' + !!accessToken);
+
     try {
-      // 🔍 Запрашиваем профиль LinkedIn через fetch
       const response = await fetch('https://api.linkedin.com/v2/userinfo', {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -44,7 +63,13 @@ export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
         },
       });
 
+      this.logger.debug('LinkedIn API response status: ' + response.status);
+
       if (!response.ok) {
+        const errorText = await response.text();
+        this.logger.error('LinkedIn API error:');
+        this.logger.error('Status: ' + response.status);
+        this.logger.error('Body: ' + errorText);
         throw new Error(`LinkedIn API error: ${response.status}`);
       }
 
@@ -62,7 +87,14 @@ export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
 
       done(null, user);
     } catch (error: unknown) {
-      console.error('❌ LinkedIn profile fetch failed:', error);
+      this.logger.error('LinkedIn profile fetch failed');
+      this.logger.error('Error type: ' + typeof error);
+      if (error instanceof Error) {
+        this.logger.error('Error message: ' + error.message);
+        if (error.stack) {
+          this.logger.error('Error stack: ' + error.stack);
+        }
+      }
 
       if (error instanceof Error) {
         done(error, undefined);
