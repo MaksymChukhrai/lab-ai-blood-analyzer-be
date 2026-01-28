@@ -77,6 +77,7 @@ async function bootstrap() {
     .setTitle('Lab AI Blood Test Analyzer API')
     .setDescription('API documentation for Lab AI healthcare platform')
     .setVersion('1.0')
+    .addServer('/api', 'API Base Path')
     .addBearerAuth()
     .build();
 
