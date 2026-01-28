@@ -128,30 +128,46 @@ export class AuthController {
     description: 'Redirects to frontend with tokens',
   })
   public async linkedinAuthCallback(
+    @Req() req: Request,
     @CurrentUser() profile: OAuthProfile,
     @Res() res: Response,
   ): Promise<void> {
     try {
-      // 🔍 DEBUG: Логируем полученный профиль
-      this.logger.debug('LinkedIn callback - received profile:', profile);
+      this.logger.debug('LinkedIn callback - query params:');
+      this.logger.debug(JSON.stringify(req.query));
+      this.logger.debug('LinkedIn callback - received profile:');
+      this.logger.debug(JSON.stringify(profile));
 
       const authResponse = await this.authService.handleOAuthLogin(profile);
 
-      // 🔍 DEBUG: Логируем успешную генерацию токенов
       this.logger.debug('LinkedIn callback - tokens generated successfully');
 
       const frontendUrl = this.configService.get<string>('FRONTEND_URL');
       const redirectUrl = `${frontendUrl}/auth/callback?access_token=${authResponse.accessToken}&refresh_token=${authResponse.refreshToken}`;
 
-      this.logger.debug('LinkedIn callback - redirecting to:', frontendUrl);
+      this.logger.debug('LinkedIn callback - redirecting to:');
+      this.logger.debug(frontendUrl);
       res.redirect(redirectUrl);
-    } catch (error) {
-      // 🔍 DEBUG: Логируем ошибку
-      this.logger.error('LinkedIn callback error:', error);
+    } catch (err: unknown) {
+      this.logger.error('LinkedIn callback error occurred');
+
+      if (err instanceof Error) {
+        this.logger.error('Error message:');
+        this.logger.error(err.message);
+        if (err.stack) {
+          this.logger.error('Error stack:');
+          this.logger.error(err.stack);
+        }
+      } else {
+        this.logger.error('Unknown error - type:');
+        this.logger.error(typeof err);
+      }
+
+      this.logger.error('Request query:');
+      this.logger.error(JSON.stringify(req.query));
 
       const frontendUrl = this.configService.get<string>('FRONTEND_URL');
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       const errorRedirectUrl = `${frontendUrl}/auth/error?message=${encodeURIComponent(errorMessage)}`;
 
       res.redirect(errorRedirectUrl);
