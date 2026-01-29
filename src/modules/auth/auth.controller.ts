@@ -37,6 +37,33 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { GoogleOAuthGuard } from './guards/google-oauth.guard';
 import { LinkedInOAuthGuard } from './guards/linkedin-oauth.guard';
 
+/**
+ * 🧪 Результат теста connectivity
+ */
+interface ConnectivityTestResult {
+  name: string;
+  status: 'OK' | 'FAIL' | 'ERROR';
+  code?: number;
+  error?: string;
+  duration?: number;
+}
+
+/**
+ * 🧪 Полный результат connectivity проверки
+ */
+interface ConnectivityResponse {
+  timestamp: string;
+  region: string;
+  railway_service: string;
+  tests: ConnectivityTestResult[];
+  summary: {
+    total: number;
+    passed: number;
+    failed: number;
+    errors: number;
+  };
+}
+
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
@@ -46,6 +73,8 @@ export class AuthController {
     private readonly authService: AuthService,
     private readonly configService: ConfigService,
   ) {}
+
+  // ============================================ Magic Link ============================================
 
   @Public()
   @Post('magic-link/request')
@@ -77,6 +106,8 @@ export class AuthController {
     return await this.authService.consumeMagicLink(token);
   }
 
+  // ============================================ Google OAuth ============================================
+
   @Public()
   @Get('google')
   @UseGuards(GoogleOAuthGuard)
@@ -106,7 +137,9 @@ export class AuthController {
 
     res.redirect(redirectUrl);
   }
-  // ============================================Linkedin OAuth============================================
+
+  // ============================================ LinkedIn OAuth ============================================
+
   @Public()
   @Get('linkedin')
   @UseGuards(LinkedInOAuthGuard)
@@ -173,7 +206,179 @@ export class AuthController {
       res.redirect(errorRedirectUrl);
     }
   }
-  // -------------------------------------------------end of LinkedIn OAuth-------------------------------------------------
+
+  // ============================================ 🧪 Diagnostics ============================================
+
+  @Public()
+  @Get('test-linkedin-connectivity')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: '🌐 Test LinkedIn API connectivity from Railway',
+    description:
+      'Checks if Railway server can reach LinkedIn OAuth and API endpoints. Used for debugging 401 errors.',
+  })
+  @ApiOkResponse({
+    description: 'Connectivity test results',
+    schema: {
+      type: 'object',
+      properties: {
+        timestamp: { type: 'string', example: '2026-01-29T12:00:00.000Z' },
+        region: { type: 'string', example: 'europe-west4' },
+        railway_service: {
+          type: 'string',
+          example: 'lab-ai-blood-analyzer-be',
+        },
+        tests: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string' },
+              status: { type: 'string', enum: ['OK', 'FAIL', 'ERROR'] },
+              code: { type: 'number' },
+              error: { type: 'string' },
+              duration: { type: 'number' },
+            },
+          },
+        },
+        summary: {
+          type: 'object',
+          properties: {
+            total: { type: 'number' },
+            passed: { type: 'number' },
+            failed: { type: 'number' },
+            errors: { type: 'number' },
+          },
+        },
+      },
+    },
+  })
+  public async testLinkedInConnectivity(): Promise<ConnectivityResponse> {
+    const results: ConnectivityTestResult[] = [];
+    const startTime = Date.now();
+
+    this.logger.log('🧪 Starting LinkedIn connectivity tests...');
+
+    // 1️⃣ Тест DNS резолва
+    await this.testEndpoint(
+      results,
+      'LinkedIn DNS (robots.txt)',
+      'https://www.linkedin.com/robots.txt',
+      'GET',
+      [200],
+    );
+
+    // 2️⃣ Тест OAuth Authorization Endpoint
+    await this.testEndpoint(
+      results,
+      'OAuth Authorization Endpoint',
+      'https://www.linkedin.com/oauth/v2/authorization',
+      'GET',
+      [400, 302], // 400 = missing params (expected), 302 = redirect
+    );
+
+    // 3️⃣ Тест OAuth Token Endpoint
+    await this.testEndpoint(
+      results,
+      'OAuth Token Endpoint',
+      'https://www.linkedin.com/oauth/v2/accessToken',
+      'POST',
+      [400], // 400 = missing params (expected)
+      { 'Content-Type': 'application/x-www-form-urlencoded' },
+    );
+
+    // 4️⃣ Тест UserInfo API Endpoint
+    await this.testEndpoint(
+      results,
+      'UserInfo API Endpoint',
+      'https://api.linkedin.com/v2/userinfo',
+      'GET',
+      [401], // 401 = missing auth (expected)
+    );
+
+    // 5️⃣ Тест LinkedIn CDN (для проверки общей доступности)
+    await this.testEndpoint(
+      results,
+      'LinkedIn CDN',
+      'https://static.licdn.com/aero-v1/sc/h/cyolgscd0imw2ldqppkrb84vo',
+      'GET',
+      [200, 304], // 200 или 304 Not Modified
+    );
+
+    const totalTime = Date.now() - startTime;
+
+    // 📊 Формируем summary
+    const summary = {
+      total: results.length,
+      passed: results.filter((r) => r.status === 'OK').length,
+      failed: results.filter((r) => r.status === 'FAIL').length,
+      errors: results.filter((r) => r.status === 'ERROR').length,
+    };
+
+    this.logger.log(
+      `🧪 Connectivity tests completed in ${totalTime}ms: ${summary.passed}/${summary.total} passed`,
+    );
+
+    return {
+      timestamp: new Date().toISOString(),
+      region: process.env.RAILWAY_REGION || 'unknown',
+      railway_service: process.env.RAILWAY_SERVICE_NAME || 'local',
+      tests: results,
+      summary,
+    };
+  }
+
+  /**
+   * 🔍 Тестирование отдельного endpoint
+   */
+  private async testEndpoint(
+    results: ConnectivityTestResult[],
+    name: string,
+    url: string,
+    method: 'GET' | 'POST',
+    expectedStatuses: number[],
+    headers?: Record<string, string>,
+  ): Promise<void> {
+    const startTime = Date.now();
+
+    try {
+      this.logger.debug(`🔍 Testing: ${name} (${url})`);
+
+      const response = await fetch(url, {
+        method,
+        headers: headers || {},
+        signal: AbortSignal.timeout(10000), // 10s timeout
+      });
+
+      const duration = Date.now() - startTime;
+      const isExpected = expectedStatuses.includes(response.status);
+
+      results.push({
+        name,
+        status: isExpected ? 'OK' : 'FAIL',
+        code: response.status,
+        duration,
+      });
+
+      this.logger.debug(
+        `${isExpected ? '✅' : '❌'} ${name}: ${response.status} (${duration}ms)`,
+      );
+    } catch (err) {
+      const duration = Date.now() - startTime;
+      const error = err as Error;
+
+      results.push({
+        name,
+        status: 'ERROR',
+        error: error.message,
+        duration,
+      });
+
+      this.logger.error(`❌ ${name}: ${error.message} (${duration}ms)`);
+    }
+  }
+
+  // ============================================ Token Management ============================================
 
   @Public()
   @UseGuards(JwtRefreshAuthGuard)
@@ -235,6 +440,8 @@ export class AuthController {
 
     return result;
   }
+
+  // ============================================ User Profile ============================================
 
   @Get('profile')
   @ApiBearerAuth()
