@@ -24,12 +24,12 @@ export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
     const clientSecret = configService.get<string>('LINKEDIN_CLIENT_SECRET');
     const callbackURL = configService.get<string>('LINKEDIN_CALLBACK_URL');
 
-    // 🔍 DEBUG: Логируем конфигурацию
+    // Логируем конфигурацию
     console.log('🔑 LinkedIn Strategy Config:', {
       clientID: clientID ? `${clientID.slice(0, 5)}...` : 'MISSING',
       clientSecret: clientSecret ? 'SET' : 'MISSING',
-      callbackURL: callbackURL || 'MISSING',
-      callbackURLLength: callbackURL?.length || 0,
+      callbackURL,
+      callbackURLLength: callbackURL?.length,
     });
 
     super({
@@ -49,10 +49,15 @@ export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
     _profile: unknown,
     done: VerifyCallback,
   ): Promise<void> {
-    this.logger.debug('LinkedIn validate called');
-    this.logger.debug('Access token exists: ' + !!accessToken);
+    this.logger.log('🔍 LinkedIn validate called');
+    this.logger.log(
+      `🔍 Access token: ${accessToken ? accessToken.slice(0, 10) + '...' : 'MISSING'}`,
+    );
 
     try {
+      // Запрашиваем профиль LinkedIn
+      this.logger.log('🔍 Fetching LinkedIn profile...');
+
       const response = await fetch('https://api.linkedin.com/v2/userinfo', {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -60,18 +65,24 @@ export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
         },
       });
 
-      this.logger.debug('LinkedIn API response status: ' + response.status);
+      this.logger.log(`🔍 LinkedIn API response status: ${response.status}`);
 
       if (!response.ok) {
         const errorText = await response.text();
-        this.logger.error('LinkedIn API error:');
-        this.logger.error('Status: ' + response.status);
-        this.logger.error('Body: ' + errorText);
-        throw new Error(`LinkedIn API error: ${response.status}`);
+        this.logger.error('❌ LinkedIn API error:', {
+          status: response.status,
+          body: errorText,
+        });
+        throw new Error(
+          `LinkedIn API error: ${response.status} - ${errorText}`,
+        );
       }
 
       const profile = (await response.json()) as LinkedInProfile;
-      console.log('✅ LinkedIn profile fetched:', profile);
+      this.logger.log('✅ LinkedIn profile fetched:', {
+        sub: profile.sub,
+        email: profile.email,
+      });
 
       const user: OAuthProfile = {
         provider: 'linkedin' as const,
@@ -84,13 +95,13 @@ export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
 
       done(null, user);
     } catch (error: unknown) {
-      this.logger.error('LinkedIn profile fetch failed');
-      this.logger.error('Error type: ' + typeof error);
+      this.logger.error('❌ LinkedIn profile fetch failed');
+
       if (error instanceof Error) {
-        this.logger.error('Error message: ' + error.message);
-        if (error.stack) {
-          this.logger.error('Error stack: ' + error.stack);
-        }
+        this.logger.error('Error message:', error.message);
+        this.logger.error('Error stack:', error.stack);
+      } else {
+        this.logger.error('Unknown error type:', typeof error);
       }
 
       if (error instanceof Error) {
