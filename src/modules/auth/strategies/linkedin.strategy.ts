@@ -17,25 +17,16 @@ interface LinkedInProfile {
   email_verified: boolean;
 }
 
-/**
- * Типизация для OAuth2 клиента из passport-oauth2
- */
 interface OAuth2Client {
   getOAuthAccessToken: GetOAuthAccessTokenFunction;
 }
 
-/**
- * Типизация для функции получения access token
- */
 type GetOAuthAccessTokenFunction = (
   code: string,
   params: Record<string, unknown>,
   callback: OAuth2Callback,
 ) => void;
 
-/**
- * Типизация для callback OAuth2
- */
 type OAuth2Callback = (
   err: OAuth2Error | null,
   accessToken?: string,
@@ -43,9 +34,6 @@ type OAuth2Callback = (
   results?: unknown,
 ) => void;
 
-/**
- * Типизация для ошибок OAuth2
- */
 interface OAuth2Error {
   message: string;
   data?: string;
@@ -61,7 +49,6 @@ export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
     const clientSecret = configService.get<string>('LINKEDIN_CLIENT_SECRET');
     const callbackURL = configService.get<string>('LINKEDIN_CALLBACK_URL');
 
-    // 📊 Логируем конфигурацию
     console.log('🔑 LinkedIn Strategy Config:', {
       clientID: clientID ? `${clientID.slice(0, 5)}...` : 'MISSING',
       clientSecret: clientSecret ? 'SET' : 'MISSING',
@@ -78,22 +65,19 @@ export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
       clientSecret: clientSecret || '',
       callbackURL: callbackURL || '',
       scope: ['openid', 'profile', 'email'],
-      state: true,
+      state: true, // ← Включено CSRF защита
       customHeaders: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
+      // 🔍 ВАЖНО: Passport требует passReqToCallback для доступа к сессии
+      passReqToCallback: false,
     });
 
-    // 🔍 ДИАГНОСТИКА: Monkey-patch для логирования OAuth2 token exchange
     this.setupTokenExchangeLogging();
   }
 
-  /**
-   * Настройка логирования token exchange
-   */
   private setupTokenExchangeLogging(): void {
     try {
-      // Используем Reflect для безопасного доступа к protected полю
       const oauth2Client = Reflect.get(this, '_oauth2') as
         | OAuth2Client
         | undefined;
@@ -105,11 +89,9 @@ export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
         return;
       }
 
-      // Сохраняем оригинальную функцию с правильной типизацией
       const originalFunction: GetOAuthAccessTokenFunction =
         oauth2Client.getOAuthAccessToken;
 
-      // Создаём wrapper функцию
       const wrappedFunction: GetOAuthAccessTokenFunction = (
         code: string,
         params: Record<string, unknown>,
@@ -126,7 +108,6 @@ export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
           'https://www.linkedin.com/oauth/v2/accessToken',
         );
 
-        // Вызываем оригинальную функцию с правильным контекстом
         originalFunction.call(
           oauth2Client,
           code,
@@ -159,7 +140,6 @@ export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
         );
       };
 
-      // Заменяем метод на wrapper
       oauth2Client.getOAuthAccessToken = wrappedFunction;
 
       console.log('✅ Token exchange logging enabled');
@@ -170,10 +150,6 @@ export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
     }
   }
 
-  /**
-   * 🔍 ЛОГИРОВАНИЕ TOKEN EXCHANGE
-   * Этот метод вызывается passport-oauth2 ПОСЛЕ получения access_token
-   */
   userProfile(
     accessToken: string,
     done: (err?: Error | null, profile?: unknown) => void,
@@ -186,13 +162,9 @@ export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
       accessToken ? `${accessToken.slice(0, 20)}...` : 'N/A',
     );
 
-    // Вызываем callback - validate() сделает реальный запрос
     done(null, { accessToken });
   }
 
-  /**
-   * 🎯 ОСНОВНОЙ МЕТОД АУТЕНТИФИКАЦИИ
-   */
   async validate(
     accessToken: string,
     _refreshToken: string,
@@ -206,7 +178,6 @@ export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
     this.logger.log(`🔍 Profile from userProfile():`, profile);
 
     try {
-      // 📡 Запрашиваем профиль LinkedIn
       this.logger.log('🔍 Fetching LinkedIn profile from API...');
       this.logger.log('🔍 API URL: https://api.linkedin.com/v2/userinfo');
 
@@ -242,7 +213,6 @@ export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
         name: linkedInProfile.name,
       });
 
-      // 🎭 Преобразуем в наш формат
       const user: OAuthProfile = {
         provider: 'linkedin' as const,
         providerId: linkedInProfile.sub,
