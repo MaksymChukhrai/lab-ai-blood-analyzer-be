@@ -1,3 +1,5 @@
+// src/modules/auth/strategies/linkedin.strategy.ts
+
 import { Injectable, Logger } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy, VerifyCallback } from 'passport-oauth2';
@@ -24,12 +26,14 @@ export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
     const clientSecret = configService.get<string>('LINKEDIN_CLIENT_SECRET');
     const callbackURL = configService.get<string>('LINKEDIN_CALLBACK_URL');
 
-    // Логируем конфигурацию
+    // 📊 Логируем конфигурацию
     console.log('🔑 LinkedIn Strategy Config:', {
       clientID: clientID ? `${clientID.slice(0, 5)}...` : 'MISSING',
       clientSecret: clientSecret ? 'SET' : 'MISSING',
       callbackURL,
-      callbackURLLength: callbackURL?.length,
+      authorizationURL: 'https://www.linkedin.com/oauth/v2/authorization',
+      tokenURL: 'https://www.linkedin.com/oauth/v2/accessToken',
+      scope: ['openid', 'profile', 'email'],
     });
 
     super({
@@ -40,23 +44,49 @@ export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
       callbackURL: callbackURL || '',
       scope: ['openid', 'profile', 'email'],
       state: true,
+      // 🔍 КРИТИЧЕСКИ ВАЖНО: customHeaders для LinkedIn OpenID
+      customHeaders: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
     });
   }
 
+  /**
+   * 🔍 ЛОГИРОВАНИЕ TOKEN EXCHANGE
+   * Этот метод вызывается passport-oauth2 ПОСЛЕ получения access_token
+   * Если он не вызывается - значит token exchange провалился
+   */
+  userProfile(
+    accessToken: string,
+    done: (err?: Error | null, profile?: any) => void,
+  ): void {
+    console.log('🔍 userProfile() called - Token exchange SUCCESS!');
+    console.log('🔍 Access token received:', accessToken ? 'YES' : 'NO');
+    console.log('🔍 Token length:', accessToken ? accessToken.length : 'N/A');
+
+    // Вызываем callback сразу - validate() сделает реальный запрос
+    done(null, { accessToken });
+  }
+
+  /**
+   * 🎯 ОСНОВНОЙ МЕТОД АУТЕНТИФИКАЦИИ
+   * Вызывается Passport после userProfile()
+   */
   async validate(
     accessToken: string,
     _refreshToken: string,
-    _profile: unknown,
+    profile: any,
     done: VerifyCallback,
   ): Promise<void> {
-    this.logger.log('🔍 LinkedIn validate called');
+    this.logger.log('🔍 LinkedIn validate() called');
     this.logger.log(
       `🔍 Access token: ${accessToken ? accessToken.slice(0, 10) + '...' : 'MISSING'}`,
     );
+    this.logger.log(`🔍 Profile from userProfile():`, profile);
 
     try {
-      // Запрашиваем профиль LinkedIn
-      this.logger.log('🔍 Fetching LinkedIn profile...');
+      // 📡 Запрашиваем профиль LinkedIn
+      this.logger.log('🔍 Fetching LinkedIn profile from API...');
 
       const response = await fetch('https://api.linkedin.com/v2/userinfo', {
         headers: {
@@ -71,6 +101,7 @@ export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
         const errorText = await response.text();
         this.logger.error('❌ LinkedIn API error:', {
           status: response.status,
+          statusText: response.statusText,
           body: errorText,
         });
         throw new Error(
@@ -78,20 +109,27 @@ export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
         );
       }
 
-      const profile = (await response.json()) as LinkedInProfile;
+      const linkedInProfile = (await response.json()) as LinkedInProfile;
       this.logger.log('✅ LinkedIn profile fetched:', {
-        sub: profile.sub,
-        email: profile.email,
+        sub: linkedInProfile.sub,
+        email: linkedInProfile.email,
+        name: linkedInProfile.name,
       });
 
+      // 🎭 Преобразуем в наш формат OAuthProfile
       const user: OAuthProfile = {
         provider: 'linkedin' as const,
-        providerId: profile.sub,
-        email: profile.email || `${profile.sub}@linkedin.com`,
-        firstName: profile.given_name || '',
-        lastName: profile.family_name || '',
-        picture: profile.picture || null,
+        providerId: linkedInProfile.sub,
+        email: linkedInProfile.email || `${linkedInProfile.sub}@linkedin.com`,
+        firstName: linkedInProfile.given_name || '',
+        lastName: linkedInProfile.family_name || '',
+        picture: linkedInProfile.picture || null,
       };
+
+      this.logger.log('✅ User object created:', {
+        provider: user.provider,
+        email: user.email,
+      });
 
       done(null, user);
     } catch (error: unknown) {
@@ -100,13 +138,9 @@ export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
       if (error instanceof Error) {
         this.logger.error('Error message:', error.message);
         this.logger.error('Error stack:', error.stack);
-      } else {
-        this.logger.error('Unknown error type:', typeof error);
-      }
-
-      if (error instanceof Error) {
         done(error, undefined);
       } else {
+        this.logger.error('Unknown error type:', typeof error);
         done(
           new Error('Unknown error during LinkedIn authentication'),
           undefined,
