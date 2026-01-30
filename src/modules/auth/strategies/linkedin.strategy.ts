@@ -56,6 +56,7 @@ export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
       authorizationURL: 'https://www.linkedin.com/oauth/v2/authorization',
       tokenURL: 'https://www.linkedin.com/oauth/v2/accessToken',
       scope: ['openid', 'profile', 'email'],
+      state: 'DISABLED (cross-site cookie issue)', // ← ОТКЛЮЧЕНО
     });
 
     super({
@@ -65,12 +66,10 @@ export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
       clientSecret: clientSecret || '',
       callbackURL: callbackURL || '',
       scope: ['openid', 'profile', 'email'],
-      state: true, // ← Включено CSRF защита
+      state: false, // ← ОТКЛЮЧАЕМ state verification
       customHeaders: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      // 🔍 ВАЖНО: Passport требует passReqToCallback для доступа к сессии
-      passReqToCallback: false,
     });
 
     this.setupTokenExchangeLogging();
