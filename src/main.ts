@@ -26,7 +26,6 @@ async function bootstrap() {
     }),
   );
 
-  // Redis client для session store
   let sessionStore: session.Store | undefined;
   const redisUrl = config.get<string>('REDIS_URL');
 
@@ -64,11 +63,14 @@ async function bootstrap() {
       secret: config.getOrThrow<string>('SESSION_SECRET'),
       resave: false,
       saveUninitialized: false,
+      name: 'connect.sid',
       cookie: {
         httpOnly: true,
         secure: isProduction,
         sameSite: isProduction ? 'none' : 'lax',
-        maxAge: 3600000,
+        maxAge: 3600000 * 24,
+        path: '/',
+        domain: isProduction ? undefined : undefined,
       },
     }),
   );
@@ -111,8 +113,9 @@ async function bootstrap() {
         callback(new Error('Not allowed by CORS'));
       }
     },
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+    exposedHeaders: ['Set-Cookie'],
     credentials: true,
   });
 

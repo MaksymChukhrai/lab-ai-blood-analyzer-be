@@ -1,3 +1,5 @@
+// src/common/services/email.service.ts
+
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SendMailOptions, Transporter } from 'nodemailer';
@@ -29,14 +31,34 @@ export class EmailService {
       this.transporter = nodemailer.createTransport({
         host,
         port,
-        auth: {
-          user,
-          pass,
+        auth: { user, pass },
+        secure: port === 465, // true для SSL (465), false для STARTTLS (587)
+
+        // 🔧 КРИТИЧНЫЕ НАСТРОЙКИ для Railway/Gmail:
+        tls: {
+          rejectUnauthorized: false, // Игнорируем самоподписанные сертификаты
+          minVersion: 'TLSv1.2', // Минимальная версия TLS
         },
-        secure: port === 465,
+
+        // ⏱️ Таймауты (по умолчанию бесконечность):
+        connectionTimeout: 10000, // 10 сек на подключение
+        greetingTimeout: 5000, // 5 сек на приветствие SMTP
+        socketTimeout: 10000, // 10 сек на операции сокета
+
+        // 📋 Логирование для дебага:
+        logger: this.configService.get<string>('NODE_ENV') !== 'production',
+        debug: this.configService.get<string>('NODE_ENV') === 'development',
       });
+
+      this.logger.log(
+        `✅ SMTP transporter initialized: ${host}:${port} (user: ${user})`,
+      );
       return Promise.resolve();
     }
+
+    this.logger.error(
+      '❌ SMTP configuration incomplete - missing required variables',
+    );
     return Promise.resolve();
   }
 
@@ -76,9 +98,22 @@ export class EmailService {
         html,
       };
 
+      // 📧 Отправка с логированием (без messageId чтобы избежать TypeScript ошибок)
+      this.logger.log(`📧 Sending email: ${payload.from} → ${payload.to}`);
       await this.transporter.sendMail(mailOptions);
+      this.logger.log(`✅ Email sent successfully to ${payload.to}`);
     } catch (error) {
-      this.logger.error('sendMagicLink failed', (error as Error).message);
+      const err = error as Error;
+      this.logger.error(`❌ sendMagicLink failed: ${err.message}`);
+
+      // Дополнительная информация для дебага:
+      if (err.message.includes('timeout')) {
+        this.logger.error('💡 Hint: Try SMTP_PORT=465 instead of 587');
+      }
+      if (err.message.includes('authentication')) {
+        this.logger.error('💡 Hint: Check SMTP_USER and SMTP_PASS are correct');
+      }
+
       throw error;
     }
   }

@@ -36,6 +36,7 @@ import { JwtRefreshAuthGuard } from './guards/jwt-refresh-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { GoogleOAuthGuard } from './guards/google-oauth.guard';
 import { LinkedInOAuthGuard } from './guards/linkedin-oauth.guard';
+import { EmailService } from '@common/services/email.service';
 
 /**
  * 🧪 Результат теста connectivity
@@ -72,6 +73,7 @@ export class AuthController {
   public constructor(
     private readonly authService: AuthService,
     private readonly configService: ConfigService,
+    private readonly emailService: EmailService,
   ) {}
 
   // ============================================ Magic Link ============================================
@@ -327,7 +329,88 @@ export class AuthController {
       summary,
     };
   }
+  // --------------диагностический endpoint----------
 
+  @Public()
+  @Get('test-smtp')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: '🔧 Test SMTP connection',
+    description: 'Diagnostic endpoint to test email sending configuration',
+  })
+  @ApiOkResponse({
+    description: 'SMTP test result',
+    schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', enum: ['OK', 'ERROR'] },
+        message: { type: 'string' },
+        config: {
+          type: 'object',
+          properties: {
+            host: { type: 'string' },
+            port: { type: 'number' },
+            user: { type: 'string' },
+            from: { type: 'string' },
+          },
+        },
+        error: { type: 'string' },
+      },
+    },
+  })
+  public async testSmtp(): Promise<any> {
+    try {
+      const host = this.configService.get<string>('SMTP_HOST');
+      const port = this.configService.get<number>('SMTP_PORT');
+      const user = this.configService.get<string>('SMTP_USER');
+      const from = this.configService.get<string>('EMAIL_FROM');
+
+      this.logger.log(`🧪 Testing SMTP configuration:`);
+      this.logger.log(`   Host: ${host}:${port}`);
+      this.logger.log(`   User: ${user}`);
+      this.logger.log(`   From: ${from}`);
+
+      // Проверяем, что EMAIL_FROM совпадает с SMTP_USER
+      if (from !== user) {
+        this.logger.warn(`⚠️ EMAIL_FROM (${from}) !== SMTP_USER (${user})`);
+        return {
+          status: 'ERROR',
+          message: 'EMAIL_FROM must match SMTP_USER for Gmail',
+          config: { host, port, user, from },
+        };
+      }
+
+      // Пробуем отправить тестовое письмо самому себе
+      await this.emailService.sendMagicLink({
+        to: user, // отправляем себе
+        from: from,
+        link: 'https://example.com/test-link',
+        expiresInSeconds: 900,
+      });
+
+      return {
+        status: 'OK',
+        message: `✅ Test email sent successfully to ${user}`,
+        config: { host, port, user, from },
+      };
+    } catch (err) {
+      const error = err as Error;
+      this.logger.error(`❌ SMTP test failed: ${error.message}`);
+
+      return {
+        status: 'ERROR',
+        message: error.message,
+        config: {
+          host: this.configService.get<string>('SMTP_HOST'),
+          port: this.configService.get<number>('SMTP_PORT'),
+          user: this.configService.get<string>('SMTP_USER'),
+          from: this.configService.get<string>('EMAIL_FROM'),
+        },
+        stack: error.stack,
+      };
+    }
+  }
+  // /================================конец эндпойнта===========
   /**
    * 🔍 Тестирование отдельного endpoint
    */

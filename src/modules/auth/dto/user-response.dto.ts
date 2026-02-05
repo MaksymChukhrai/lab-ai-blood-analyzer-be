@@ -30,7 +30,7 @@ export class UserResponseDto {
     example: 'google',
     enum: ['magic_link', 'google', 'linkedin'],
   })
-  public provider: string; // ✅ Изменено на string
+  public provider: string;
 
   @ApiProperty({ example: '2024-01-01T00:00:00.000Z' })
   public createdAt: Date;
