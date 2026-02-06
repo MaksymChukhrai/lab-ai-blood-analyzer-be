@@ -25,23 +25,37 @@ export const envValidationSchema = Joi.object({
     .optional()
     .default('http://localhost:3000/api')
     .description('Backend base URL for email links'),
-  EMAIL_FROM: Joi.string().email().required(),
 
-  SMTP_HOST: Joi.string().required(),
-  SMTP_PORT: Joi.number().default(587),
-  SMTP_USER: Joi.string().required(),
-  SMTP_PASS: Joi.string().required(),
+  // ========================================
+  // 🔧 Email Service (Resend)
+  // ========================================
+  RESEND_API_KEY: Joi.string()
+    .optional()
+    .description('Resend API key for email sending'),
+  RESEND_FROM: Joi.string()
+    .email()
+    .optional()
+    .default('onboarding@resend.dev')
+    .description('Resend sender email address'),
 
-  // GOOGLE_CLIENT_ID: Joi.string().required(),
-  // GOOGLE_CLIENT_SECRET: Joi.string().required(),
+  // ========================================
+  // 📧 Legacy SMTP (optional, for backward compatibility)
+  // ========================================
+  EMAIL_FROM: Joi.string().email().optional(),
+  SMTP_HOST: Joi.string().optional(),
+  SMTP_PORT: Joi.number().optional().default(587),
+  SMTP_USER: Joi.string().optional(),
+  SMTP_PASS: Joi.string().optional(),
+
+  // ========================================
+  // 🔐 OAuth Providers
+  // ========================================
   GOOGLE_CALLBACK_URL: Joi.string()
     .uri()
     .allow('')
     .default('http://localhost:3000/api/auth/google/callback')
     .description('Google OAuth callback URL'),
 
-  // LINKEDIN_CLIENT_ID: Joi.string().required(),
-  // LINKEDIN_CLIENT_SECRET: Joi.string().required(),
   LINKEDIN_CALLBACK_URL: Joi.string()
     .uri()
     .allow('')
@@ -50,6 +64,9 @@ export const envValidationSchema = Joi.object({
 
   SESSION_SECRET: Joi.string().required(),
 
+  // ========================================
+  // 🌐 Frontend & CORS
+  // ========================================
   FRONTEND_URL: Joi.string()
     .uri()
     .allow('')
@@ -91,5 +108,8 @@ export const envValidationSchema = Joi.object({
       'any.invalid': 'ALLOWED_ORIGINS must be comma-separated valid URIs',
     }),
 
+  // ========================================
+  // 🤖 AI Services
+  // ========================================
   GEMINI_API_KEY: Joi.string().required(),
 });
