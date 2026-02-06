@@ -2,8 +2,7 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SendMailOptions, Transporter } from 'nodemailer';
-import * as nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
 export type MagicLinkEmailPayload = {
   to: string;
@@ -15,63 +14,30 @@ export type MagicLinkEmailPayload = {
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
-  private transporter: Transporter;
+  private resend: Resend | null = null;
 
-  public constructor(private readonly configService: ConfigService) {}
+  public constructor(private readonly configService: ConfigService) {
+    this.initResend();
+  }
 
-  private ensureTransporter(): Promise<void> {
-    if (this.transporter) return Promise.resolve();
+  private initResend(): void {
+    const apiKey = this.configService.get<string>('RESEND_API_KEY');
 
-    const host = this.configService.get<string>('SMTP_HOST');
-    const port = this.configService.get<number>('SMTP_PORT');
-    const user = this.configService.get<string>('SMTP_USER');
-    const pass = this.configService.get<string>('SMTP_PASS');
-
-    if (host && port && user && pass) {
-      this.transporter = nodemailer.createTransport({
-        host,
-        port,
-        auth: { user, pass },
-        secure: port === 465, // true для SSL (465), false для STARTTLS (587)
-
-        // 🔧 КРИТИЧНЫЕ НАСТРОЙКИ для Railway/Gmail:
-        tls: {
-          rejectUnauthorized: false, // Игнорируем самоподписанные сертификаты
-          minVersion: 'TLSv1.2', // Минимальная версия TLS
-        },
-
-        // ⏱️ Таймауты (по умолчанию бесконечность):
-        connectionTimeout: 10000, // 10 сек на подключение
-        greetingTimeout: 5000, // 5 сек на приветствие SMTP
-        socketTimeout: 10000, // 10 сек на операции сокета
-
-        // 📋 Логирование для дебага:
-        logger: this.configService.get<string>('NODE_ENV') !== 'production',
-        debug: this.configService.get<string>('NODE_ENV') === 'development',
-      });
-
-      this.logger.log(
-        `✅ SMTP transporter initialized: ${host}:${port} (user: ${user})`,
-      );
-      return Promise.resolve();
+    if (apiKey) {
+      this.resend = new Resend(apiKey);
+      this.logger.log(`✅ Resend email service initialized`);
+    } else {
+      this.logger.error('❌ RESEND_API_KEY not found in environment variables');
     }
-
-    this.logger.error(
-      '❌ SMTP configuration incomplete - missing required variables',
-    );
-    return Promise.resolve();
   }
 
   public async sendMagicLink(payload: MagicLinkEmailPayload): Promise<void> {
     try {
-      await this.ensureTransporter();
-
-      if (!this.transporter) {
-        throw new Error('Mail transporter is not initialized');
+      if (!this.resend) {
+        throw new Error('Resend client is not initialized');
       }
 
       const subject = 'Your one-time sign-in link';
-      const text = `Sign in using this link (valid for ${Math.floor(payload.expiresInSeconds / 60)} minutes): ${payload.link}`;
       const html = `
         <div style="font-family: Arial, Helvetica, sans-serif; max-width:600px; margin:auto; padding:20px;">
           <p>Hello,</p>
@@ -90,30 +56,26 @@ export class EmailService {
         </div>
       `;
 
-      const mailOptions: SendMailOptions = {
-        from: payload.from,
-        to: payload.to,
-        subject,
-        text,
-        html,
-      };
+      this.logger.log(
+        `📧 Sending email via Resend: ${payload.from} → ${payload.to}`,
+      );
 
-      // 📧 Отправка с логированием (без messageId чтобы избежать TypeScript ошибок)
-      this.logger.log(`📧 Sending email: ${payload.from} → ${payload.to}`);
-      await this.transporter.sendMail(mailOptions);
-      this.logger.log(`✅ Email sent successfully to ${payload.to}`);
+      const { data, error } = await this.resend.emails.send({
+        from: payload.from,
+        to: [payload.to],
+        subject,
+        html,
+      });
+
+      if (error) {
+        throw new Error(`Resend API error: ${error.message}`);
+      }
+
+      this.logger.log(`✅ Email sent successfully via Resend to ${payload.to}`);
+      this.logger.debug(`Resend email ID: ${data?.id || 'N/A'}`);
     } catch (error) {
       const err = error as Error;
       this.logger.error(`❌ sendMagicLink failed: ${err.message}`);
-
-      // Дополнительная информация для дебага:
-      if (err.message.includes('timeout')) {
-        this.logger.error('💡 Hint: Try SMTP_PORT=465 instead of 587');
-      }
-      if (err.message.includes('authentication')) {
-        this.logger.error('💡 Hint: Check SMTP_USER and SMTP_PASS are correct');
-      }
-
       throw error;
     }
   }

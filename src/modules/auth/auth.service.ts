@@ -123,7 +123,9 @@ export class AuthService {
 
       const backendUrl = this.configService.getOrThrow<string>('BACKEND_URL');
       const magicLink = `${backendUrl}/auth/magic-link/consume?token=${token}`;
-      const emailFrom = this.configService.getOrThrow<string>('EMAIL_FROM');
+      const emailFrom =
+        this.configService.get<string>('RESEND_FROM') ||
+        'onboarding@resend.dev';
 
       await this.emailService.sendMagicLink({
         to: email,

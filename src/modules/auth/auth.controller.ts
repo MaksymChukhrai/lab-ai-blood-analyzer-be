@@ -25,7 +25,6 @@ import { ConfigService } from '@nestjs/config';
 import { RequestMagicLinkDto } from './dto/request-magic-link.dto';
 import { AuthService } from './auth.service';
 import { OAuthProfile } from '@app-types/oauth-profile.interface';
-import { AuthResponseDto } from './dto/auth-response.dto';
 import { ResponseMagicLinkDto } from './dto/response-magic-link.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { UserResponseDto } from './dto/user-response.dto';
@@ -96,16 +95,39 @@ export class AuthController {
 
   @Public()
   @Get('magic-link/consume')
-  @ApiOperation({ summary: 'Consume magic link token and get JWT' })
-  @ApiOkResponse({
-    description: 'Auth response (token + user)',
-    type: AuthResponseDto,
+  @ApiOperation({
+    summary: 'Consume magic link token and redirect to frontend',
+  })
+  @ApiResponse({
+    status: HttpStatus.FOUND,
+    description: 'Redirects to frontend with tokens',
   })
   @ApiBadRequestResponse({ description: 'Invalid or expired token' })
   public async consumeMagicLink(
     @Query('token') token: string,
-  ): Promise<AuthResponseDto> {
-    return await this.authService.consumeMagicLink(token);
+    @Res() res: Response,
+  ): Promise<void> {
+    try {
+      const authResponse = await this.authService.consumeMagicLink(token);
+
+      // Редирект на фронтенд (как в Google/LinkedIn)
+      const frontendUrl = this.configService.get<string>('FRONTEND_URL');
+      const redirectUrl = `${frontendUrl}/auth/callback?access_token=${authResponse.accessToken}&refresh_token=${authResponse.refreshToken}`;
+
+      this.logger.log(
+        `Magic link consumed for ${authResponse.user.email}, redirecting to frontend`,
+      );
+      res.redirect(redirectUrl);
+    } catch (error) {
+      const err = error as Error;
+      this.logger.error(`Magic link consumption failed: ${err.message}`);
+
+      // Редирект на страницу ошибки
+      const frontendUrl = this.configService.get<string>('FRONTEND_URL');
+      const errorRedirectUrl = `${frontendUrl}/auth/error?message=${encodeURIComponent(err.message)}`;
+
+      res.redirect(errorRedirectUrl);
+    }
   }
 
   // ============================================ Google OAuth ============================================
@@ -329,17 +351,16 @@ export class AuthController {
       summary,
     };
   }
-  // --------------диагностический endpoint----------
 
   @Public()
   @Get('test-smtp')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: '🔧 Test SMTP connection',
-    description: 'Diagnostic endpoint to test email sending configuration',
+    summary: '🔧 Test email service',
+    description: 'Diagnostic endpoint to test Resend email configuration',
   })
   @ApiOkResponse({
-    description: 'SMTP test result',
+    description: 'Email service test result',
     schema: {
       type: 'object',
       properties: {
@@ -348,9 +369,7 @@ export class AuthController {
         config: {
           type: 'object',
           properties: {
-            host: { type: 'string' },
-            port: { type: 'number' },
-            user: { type: 'string' },
+            service: { type: 'string', example: 'Resend' },
             from: { type: 'string' },
           },
         },
@@ -358,59 +377,64 @@ export class AuthController {
       },
     },
   })
-  public async testSmtp(): Promise<any> {
+  public async testSmtp(): Promise<{
+    status: string;
+    message: string;
+    config: {
+      service: string;
+      from: string | undefined;
+    };
+    stack?: string;
+  }> {
     try {
-      const host = this.configService.get<string>('SMTP_HOST');
-      const port = this.configService.get<number>('SMTP_PORT');
-      const user = this.configService.get<string>('SMTP_USER');
-      const from = this.configService.get<string>('EMAIL_FROM');
+      const from =
+        this.configService.get<string>('RESEND_FROM') ||
+        'onboarding@resend.dev';
+      const apiKey = this.configService.get<string>('RESEND_API_KEY');
 
-      this.logger.log(`🧪 Testing SMTP configuration:`);
-      this.logger.log(`   Host: ${host}:${port}`);
-      this.logger.log(`   User: ${user}`);
-      this.logger.log(`   From: ${from}`);
-
-      // Проверяем, что EMAIL_FROM совпадает с SMTP_USER
-      if (from !== user) {
-        this.logger.warn(`⚠️ EMAIL_FROM (${from}) !== SMTP_USER (${user})`);
+      if (!apiKey) {
         return {
           status: 'ERROR',
-          message: 'EMAIL_FROM must match SMTP_USER for Gmail',
-          config: { host, port, user, from },
+          message: 'RESEND_API_KEY not configured',
+          config: { service: 'Resend', from },
         };
       }
 
-      // Пробуем отправить тестовое письмо самому себе
+      this.logger.log(`🧪 Testing Resend email service:`);
+      this.logger.log(`   From: ${from}`);
+      this.logger.log(`   API Key: ${apiKey.substring(0, 10)}...`);
+
+      // Отправляем тестовое письмо
       await this.emailService.sendMagicLink({
-        to: user, // отправляем себе
-        from: from,
+        to: 'm.chukhrai@gmail.com', // твой email для теста
+        from,
         link: 'https://example.com/test-link',
         expiresInSeconds: 900,
       });
 
       return {
         status: 'OK',
-        message: `✅ Test email sent successfully to ${user}`,
-        config: { host, port, user, from },
+        message: `✅ Test email sent successfully to m.chukhrai@gmail.com`,
+        config: { service: 'Resend', from },
       };
     } catch (err) {
       const error = err as Error;
-      this.logger.error(`❌ SMTP test failed: ${error.message}`);
+      this.logger.error(`❌ Email service test failed: ${error.message}`);
 
       return {
         status: 'ERROR',
         message: error.message,
         config: {
-          host: this.configService.get<string>('SMTP_HOST'),
-          port: this.configService.get<number>('SMTP_PORT'),
-          user: this.configService.get<string>('SMTP_USER'),
-          from: this.configService.get<string>('EMAIL_FROM'),
+          service: 'Resend',
+          from:
+            this.configService.get<string>('RESEND_FROM') ||
+            'onboarding@resend.dev',
         },
         stack: error.stack,
       };
     }
   }
-  // /================================конец эндпойнта===========
+
   /**
    * 🔍 Тестирование отдельного endpoint
    */
