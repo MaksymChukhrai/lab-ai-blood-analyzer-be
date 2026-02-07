@@ -23,6 +23,25 @@ services:
       start_period: 40s
 
   # ========================================
+  # Redis Cache
+  # ========================================
+  redis:
+    image: redis:7-alpine
+    container_name: blood_test_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ========================================
   # Backend (Production)
   # ========================================
   backend:
@@ -94,10 +113,18 @@ services:
     networks:
       - app-network
 
+# ========================================
+# Networks (только один раз!)
+# ========================================
 networks:
   app-network:
     driver: bridge
 
+# ========================================
+# Volumes (только один раз!)
+# ========================================
 volumes:
   mysql_data:
+    driver: local
+  redis_data:
     driver: local

@@ -37,9 +37,6 @@ import { GoogleOAuthGuard } from './guards/google-oauth.guard';
 import { LinkedInOAuthGuard } from './guards/linkedin-oauth.guard';
 import { EmailService } from '@common/services/email.service';
 
-/**
- * 🧪 Результат теста connectivity
- */
 interface ConnectivityTestResult {
   name: string;
   status: 'OK' | 'FAIL' | 'ERROR';
@@ -48,9 +45,6 @@ interface ConnectivityTestResult {
   duration?: number;
 }
 
-/**
- * 🧪 Полный результат connectivity проверки
- */
 interface ConnectivityResponse {
   timestamp: string;
   region: string;
@@ -110,7 +104,6 @@ export class AuthController {
     try {
       const authResponse = await this.authService.consumeMagicLink(token);
 
-      // Редирект на фронтенд (как в Google/LinkedIn)
       const frontendUrl = this.configService.get<string>('FRONTEND_URL');
       const redirectUrl = `${frontendUrl}/auth/callback?access_token=${authResponse.accessToken}&refresh_token=${authResponse.refreshToken}`;
 
@@ -122,7 +115,6 @@ export class AuthController {
       const err = error as Error;
       this.logger.error(`Magic link consumption failed: ${err.message}`);
 
-      // Редирект на страницу ошибки
       const frontendUrl = this.configService.get<string>('FRONTEND_URL');
       const errorRedirectUrl = `${frontendUrl}/auth/error?message=${encodeURIComponent(err.message)}`;
 
@@ -172,9 +164,7 @@ export class AuthController {
     status: HttpStatus.FOUND,
     description: 'Redirects to LinkedIn authorization page',
   })
-  public async linkedinAuth(): Promise<void> {
-    // Passport автоматически обрабатывает редирект на LinkedIn
-  }
+  public async linkedinAuth(): Promise<void> {}
 
   @Public()
   @Get('linkedin/callback')
@@ -283,7 +273,6 @@ export class AuthController {
 
     this.logger.log('🧪 Starting LinkedIn connectivity tests...');
 
-    // 1️⃣ Тест DNS резолва
     await this.testEndpoint(
       results,
       'LinkedIn DNS (robots.txt)',
@@ -292,16 +281,14 @@ export class AuthController {
       [200],
     );
 
-    // 2️⃣ Тест OAuth Authorization Endpoint
     await this.testEndpoint(
       results,
       'OAuth Authorization Endpoint',
       'https://www.linkedin.com/oauth/v2/authorization',
       'GET',
-      [400, 302], // 400 = missing params (expected), 302 = redirect
+      [400, 302],
     );
 
-    // 3️⃣ Тест OAuth Token Endpoint
     await this.testEndpoint(
       results,
       'OAuth Token Endpoint',
@@ -311,7 +298,6 @@ export class AuthController {
       { 'Content-Type': 'application/x-www-form-urlencoded' },
     );
 
-    // 4️⃣ Тест UserInfo API Endpoint
     await this.testEndpoint(
       results,
       'UserInfo API Endpoint',
@@ -320,18 +306,16 @@ export class AuthController {
       [401], // 401 = missing auth (expected)
     );
 
-    // 5️⃣ Тест LinkedIn CDN (для проверки общей доступности)
     await this.testEndpoint(
       results,
       'LinkedIn CDN',
       'https://static.licdn.com/aero-v1/sc/h/cyolgscd0imw2ldqppkrb84vo',
       'GET',
-      [200, 304], // 200 или 304 Not Modified
+      [200, 304],
     );
 
     const totalTime = Date.now() - startTime;
 
-    // 📊 Формируем summary
     const summary = {
       total: results.length,
       passed: results.filter((r) => r.status === 'OK').length,
@@ -404,9 +388,8 @@ export class AuthController {
       this.logger.log(`   From: ${from}`);
       this.logger.log(`   API Key: ${apiKey.substring(0, 10)}...`);
 
-      // Отправляем тестовое письмо
       await this.emailService.sendMagicLink({
-        to: 'm.chukhrai@gmail.com', // твой email для теста
+        to: 'm.chukhrai@gmail.com',
         from,
         link: 'https://example.com/test-link',
         expiresInSeconds: 900,
@@ -435,9 +418,7 @@ export class AuthController {
     }
   }
 
-  /**
-   * 🔍 Тестирование отдельного endpoint
-   */
+  // 🔍 Testing a single endpoint
   private async testEndpoint(
     results: ConnectivityTestResult[],
     name: string,
@@ -454,7 +435,7 @@ export class AuthController {
       const response = await fetch(url, {
         method,
         headers: headers || {},
-        signal: AbortSignal.timeout(10000), // 10s timeout
+        signal: AbortSignal.timeout(10000),
       });
 
       const duration = Date.now() - startTime;

@@ -44,11 +44,9 @@ export class AuthService {
       });
 
       if (!user) {
-        user = queryRunner.manager.create(UserEntity, {
-          ...profile,
-        });
+        user = queryRunner.manager.create(UserEntity, profile);
         this.logger.log(
-          `New user created via ${profile.provider}: ${profile.email}`,
+          `✅ New user created via ${profile.provider}: ${profile.email}`,
         );
       } else {
         user.provider = profile.provider;
@@ -56,9 +54,8 @@ export class AuthService {
         user.firstName = profile.firstName || user.firstName;
         user.lastName = profile.lastName || user.lastName;
         user.picture = profile.picture || user.picture;
-
         this.logger.log(
-          `Existing user logged in via ${profile.provider}: ${profile.email} (previous provider: ${user.provider})`,
+          `✅ User logged in via ${profile.provider}: ${profile.email}`,
         );
       }
 
@@ -79,7 +76,7 @@ export class AuthService {
     } catch (error) {
       await queryRunner.rollbackTransaction();
       this.logger.error(
-        `OAuth login failed for ${profile.email}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        `❌ OAuth login failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
       throw error;
     } finally {
@@ -96,9 +93,7 @@ export class AuthService {
       );
       const expiresAt = Date.now() + expirySeconds * 1000;
 
-      let user = await this.userRepository.findOne({
-        where: { email },
-      });
+      let user = await this.userRepository.findOne({ where: { email } });
 
       if (!user) {
         user = this.userRepository.create({
@@ -106,6 +101,7 @@ export class AuthService {
           provider: 'magic_link',
         });
         await this.userRepository.save(user);
+        this.logger.log(`✅ New user created for magic link: ${email}`);
       }
 
       await this.tokenRepository.delete({
@@ -118,26 +114,21 @@ export class AuthService {
         user,
         expiresAt,
       });
-
       await this.tokenRepository.save(magicLinkToken);
 
       const backendUrl = this.configService.getOrThrow<string>('BACKEND_URL');
       const magicLink = `${backendUrl}/auth/magic-link/consume?token=${token}`;
-      const emailFrom =
-        this.configService.get<string>('RESEND_FROM') ||
-        'onboarding@resend.dev';
 
       await this.emailService.sendMagicLink({
         to: email,
-        from: emailFrom,
         link: magicLink,
         expiresInSeconds: expirySeconds,
       });
 
-      this.logger.log(`Magic link sent to ${email}`);
+      this.logger.log(`✅ Magic link sent to ${email}`);
     } catch (error) {
       this.logger.error(
-        `Failed to send magic link: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        `❌ Failed to send magic link: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
       throw new BadRequestException('Failed to send magic link');
     }
@@ -165,16 +156,14 @@ export class AuthService {
 
     await this.tokenRepository.delete({ id: magicLinkToken.id });
 
-    const expiresIn = this.configService.getOrThrow<number>(
-      'JWT_EXPIRES_IN_SECONDS',
-    );
-
-    this.logger.log(`User ${user.email} logged in via magic link`);
+    this.logger.log(`✅ User logged in via magic link: ${user.email}`);
 
     return {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
-      expiresIn,
+      expiresIn: this.configService.getOrThrow<number>(
+        'JWT_EXPIRES_IN_SECONDS',
+      ),
       user: new UserResponseDto(user),
     };
   }
@@ -199,15 +188,12 @@ export class AuthService {
       user.refreshToken = tokens.refreshToken;
       await this.userRepository.save(user);
 
-      this.logger.log(`Tokens refreshed for user ${user.email}`);
+      this.logger.log(`✅ Tokens refreshed for user: ${user.email}`);
 
-      return {
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken,
-      };
+      return tokens;
     } catch (error) {
       this.logger.error(
-        `Token refresh failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        `❌ Token refresh failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
       throw new UnauthorizedException('Invalid refresh token');
     }
@@ -232,9 +218,7 @@ export class AuthService {
 
       const deleteResult = await queryRunner.manager.delete(
         MagicLinkTokenEntity,
-        {
-          user: { id: userId },
-        },
+        { user: { id: userId } },
       );
 
       await queryRunner.commitTransaction();
@@ -243,14 +227,14 @@ export class AuthService {
         typeof deleteResult.affected === 'number' ? deleteResult.affected : 0;
 
       this.logger.log(
-        `User ${userId} (${user.email}) logged out successfully. Deleted ${tokensDeleted} magic link token(s).`,
+        `✅ User logged out: ${user.email} (deleted ${tokensDeleted} tokens)`,
       );
 
       return { message: 'Logged out successfully' };
     } catch (error) {
       await queryRunner.rollbackTransaction();
       this.logger.error(
-        `Logout failed for user ${userId}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        `❌ Logout failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
       throw error;
     } finally {
@@ -281,9 +265,6 @@ export class AuthService {
       ),
     });
 
-    return {
-      accessToken,
-      refreshToken,
-    };
+    return { accessToken, refreshToken };
   }
 }

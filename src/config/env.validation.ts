@@ -23,56 +23,33 @@ export const envValidationSchema = Joi.object({
     .uri()
     .allow('')
     .optional()
-    .default('http://localhost:3000/api')
-    .description('Backend base URL for email links'),
+    .default('http://localhost:3000/api'),
 
-  // ========================================
-  // 🔧 Email Service (Resend)
-  // ========================================
-  RESEND_API_KEY: Joi.string()
-    .optional()
-    .description('Resend API key for email sending'),
-  RESEND_FROM: Joi.string()
-    .email()
-    .optional()
-    .default('onboarding@resend.dev')
-    .description('Resend sender email address'),
+  // Email Service (Resend)
+  RESEND_API_KEY: Joi.string().optional(),
+  RESEND_FROM: Joi.string().email().optional().default('onboarding@resend.dev'),
+  RESEND_FROM_NAME: Joi.string().optional().default('AI Lab Analyzer'),
 
-  // ========================================
-  // 📧 Legacy SMTP (optional, for backward compatibility)
-  // ========================================
+  // Legacy SMTP (optional)
   EMAIL_FROM: Joi.string().email().optional(),
   SMTP_HOST: Joi.string().optional(),
   SMTP_PORT: Joi.number().optional().default(587),
   SMTP_USER: Joi.string().optional(),
   SMTP_PASS: Joi.string().optional(),
 
-  // ========================================
-  // 🔐 OAuth Providers
-  // ========================================
+  // OAuth
   GOOGLE_CALLBACK_URL: Joi.string()
     .uri()
     .allow('')
-    .default('http://localhost:3000/api/auth/google/callback')
-    .description('Google OAuth callback URL'),
-
+    .default('http://localhost:3000/api/auth/google/callback'),
   LINKEDIN_CALLBACK_URL: Joi.string()
     .uri()
     .allow('')
-    .default('http://localhost:3000/api/auth/linkedin/callback')
-    .description('LinkedIn OAuth callback URL'),
-
+    .default('http://localhost:3000/api/auth/linkedin/callback'),
   SESSION_SECRET: Joi.string().required(),
 
-  // ========================================
-  // 🌐 Frontend & CORS
-  // ========================================
-  FRONTEND_URL: Joi.string()
-    .uri()
-    .allow('')
-    .default('http://localhost:5173')
-    .description('Frontend application URL'),
-
+  // Frontend & CORS
+  FRONTEND_URL: Joi.string().uri().allow('').default('http://localhost:5173'),
   ALLOWED_ORIGINS: Joi.string()
     .optional()
     .default('http://localhost:5173')
@@ -108,8 +85,6 @@ export const envValidationSchema = Joi.object({
       'any.invalid': 'ALLOWED_ORIGINS must be comma-separated valid URIs',
     }),
 
-  // ========================================
-  // 🤖 AI Services
-  // ========================================
+  // AI Services
   GEMINI_API_KEY: Joi.string().required(),
 });

@@ -56,7 +56,7 @@ export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
       authorizationURL: 'https://www.linkedin.com/oauth/v2/authorization',
       tokenURL: 'https://www.linkedin.com/oauth/v2/accessToken',
       scope: ['openid', 'profile', 'email'],
-      state: 'DISABLED (cross-site cookie issue)', // ← ОТКЛЮЧЕНО
+      state: 'DISABLED (cross-site cookie issue)',
     });
 
     super({
@@ -66,7 +66,7 @@ export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
       clientSecret: clientSecret || '',
       callbackURL: callbackURL || '',
       scope: ['openid', 'profile', 'email'],
-      state: false, // ← ОТКЛЮЧАЕМ state verification
+      state: false,
       customHeaders: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
