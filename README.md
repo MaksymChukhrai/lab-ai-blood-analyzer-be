@@ -326,7 +326,7 @@ GET    /api/analysis/history               # User's analysis history
 #### Health
 
 ```Bash
-GET    /health                             # Application health status
+GET    api/health                           # Application health status
 ```
 
 ### Full API Documentation
