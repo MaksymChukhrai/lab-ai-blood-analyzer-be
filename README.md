@@ -8,7 +8,7 @@
 [![Redis](https://img.shields.io/badge/Redis-7.x-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io/)
 [![Railway](https://img.shields.io/badge/Railway-Deployed-0B0D0E?style=for-the-badge&logo=railway&logoColor=white)](https://railway.app/)
 
-[🌐 Live Demo](https://lab-ai-blood-analyzer.vercel.app) • [📚 API Docs](https://lab-ai-blood-analyzer-be-production.up.railway.app/api/docs) • [💚 Health Check](https://lab-ai-blood-analyzer-be-production.up.railway.app/health) • [🎨 Frontend Repo](https://github.com/MaksymChukhrai/lab-ai-blood-analyzer)
+[🌐 Live Demo](https://lab-ai-blood-analyzer.vercel.app) • [📚 API Docs](https://lab-ai-blood-analyzer-be-production.up.railway.app/api/docs) • [💚 Health Check](https://lab-ai-blood-analyzer-be-production.up.railway.app/api/health) • [🎨 Frontend Repo](https://github.com/MaksymChukhrai/lab-ai-blood-analyzer)
 
 </div>
 
@@ -406,6 +406,6 @@ src/
 [Frontend Repository](https://github.com/MaksymChukhrai/lab-ai-blood-analyzer)  
 [Live Application](https://lab-ai-blood-analyzer.vercel.app)   
 [Swagger API Documentation](https://lab-ai-blood-analyzer-be-production.up.railway.app/api/docs)  
-[Health Check](https://lab-ai-blood-analyzer-be-production.up.railway.app/health)
+[Health Check](https://lab-ai-blood-analyzer-be-production.up.railway.app/api/health)
 
 - [Jump to the 📑 Table of Contents](#-table-of-contents)
